@@ -15,11 +15,14 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <getopt.h>
 #include <string.h>
 #include <limits.h>
 #include <poll.h>
+#include <fcntl.h>
 
 #include "uthash.h"
 #include "fling.h"
@@ -172,6 +175,20 @@ void seal_object(int conn, plasma_request* req) {
   free(notify_entry);
 }
 
+void expose_object(plasma_request* req) {
+  int fd;
+  if ((fd = open("/tmp/test", O_WRONLY | O_CREAT)) == -1) {
+    LOG_ERR("could not open file");
+  }
+  object_table_entry *entry;
+  HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(plasma_id), entry);
+  char buf[BUFSIZE];
+  size_t size;
+  while ((size = read(entry->fd, buf, BUFSIZ)) > 0) {
+    write(fd, buf, size);
+  }
+}
+
 void process_event(int conn, plasma_request* req) {
   switch (req->type) {
   case PLASMA_CREATE:
@@ -182,6 +199,9 @@ void process_event(int conn, plasma_request* req) {
     break;
   case PLASMA_SEAL:
     seal_object(conn, req);
+    break;
+  case PLASMA_EXPOSE:
+    expose_object(req);
     break;
   default:
     LOG_ERR("invalid request %d", req->type);

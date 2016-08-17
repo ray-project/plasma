@@ -6,6 +6,8 @@
 #include <errno.h>
 #include <string.h>
 
+#define BUFSIZE 4096
+
 #define LOG_ERR(M, ...) \
   fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", \
     __FILE__, __LINE__, errno == 0 ? "None" : strerror(errno), ##__VA_ARGS__)
@@ -28,6 +30,7 @@ enum plasma_request_type {
   PLASMA_CREATE, // create a new object
   PLASMA_GET, // get an object
   PLASMA_SEAL, // seal an object
+  PLASMA_EXPOSE, // export object to the filesystem
   PLASMA_TRANSFER, // request transfer to another store
   PLASMA_DATA, // header for sending data
   PLASMA_REGISTER // register a plasma manager
