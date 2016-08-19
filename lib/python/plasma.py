@@ -16,8 +16,6 @@ PLASMA_SEAL = 2
 PLASMA_TRANSFER = 3
 PLASMA_DATA = 4
 PLASMA_REGISTER = 5
-PLASMA_GET_MANAGER_PORT = 6
-PLASMA_RETURN_MANAGER_PORT = 7
 
 class PlasmaRequest(ctypes.Structure):
   _fields_ = [("type", ctypes.c_int),

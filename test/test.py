@@ -9,7 +9,7 @@ import time
 import plasma
 
 def random_object_id():
-  return "".join([chr(random.randint(0, 256)) for _ in range(20)])
+  return "".join([chr(random.randint(0, 255)) for _ in range(20)])
 
 class TestPlasmaClient(unittest.TestCase):
 
@@ -77,27 +77,10 @@ class TestPlasmaManager(unittest.TestCase):
     # Start two PlasmaManagers.
     time.sleep(0.1)
     plasma_manager_executable = os.path.join(os.path.abspath(os.path.dirname(__file__)), "../build/plasma_manager")
-    self.p4 = subprocess.Popen([plasma_manager_executable, "-n", "127.0.0.1:16121", "-s", "/tmp/store1", "-m", "127.0.0.1"])
-    self.p5 = subprocess.Popen([plasma_manager_executable, "-n", "127.0.0.1:16121", "-s", "/tmp/store2", "-m", "127.0.0.1"])
-    time.sleep(0.1)
-    # Connect to the nameserver.
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(("127.0.0.1", 16121))
-    # Get the port for the first PlasmaManager.
-    req = plasma.PlasmaRequest(type=plasma.PLASMA_GET_MANAGER_PORT, manager_id=0)
-    sock.send(buffer(req)[:])
-    request = plasma.PlasmaRequest()
-    sock.recv_into(request)
-    port1 = request.port
-    time.sleep(0.1)
-    # Get the port for the second PlasmaManager.
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(("127.0.0.1", 16121))
-    req = plasma.PlasmaRequest(type=plasma.PLASMA_GET_MANAGER_PORT, manager_id=1)
-    sock.send(buffer(req)[:])
-    request = plasma.PlasmaRequest()
-    sock.recv_into(request)
-    port2 = request.port
+    self.p4 = subprocess.Popen([plasma_manager_executable, "-n", "127.0.0.1:16121", "-s", "/tmp/store1", "-m", "127.0.0.1"], stdout=subprocess.PIPE)
+    port1 = int(self.p4.stdout.readline())
+    self.p5 = subprocess.Popen([plasma_manager_executable, "-n", "127.0.0.1:16121", "-s", "/tmp/store2", "-m", "127.0.0.1"], stdout=subprocess.PIPE)
+    port2 = int(self.p5.stdout.readline())
     # Connect two Python PlasmaManagers.
     self.manager1 = plasma.PlasmaManager("127.0.0.1", port1)
     self.manager2 = plasma.PlasmaManager("127.0.0.1", port2)

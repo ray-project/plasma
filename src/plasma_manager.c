@@ -340,6 +340,10 @@ void start_server(const char *store_socket_name, const char* master_addr,
     LOG_ERR("could not listen to socket");
     exit(-1);
   }
+  // Print out the port on stdout so the process that started the plasma manager
+  // can get it by reading from the stdout pipe.
+  fprintf(stdout, "%d\n", ntohs(name.sin_port));
+  fflush(stdout);
   register_with_nameserver(nameserver_addr, nameserver_port, master_addr, ntohs(name.sin_port));
   plasma_manager_state state;
   init_manager_state(&state, store_socket_name);

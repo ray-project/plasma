@@ -1,3 +1,4 @@
+from __future__ import print_function
 import collections
 import socket
 import ctypes
@@ -34,13 +35,9 @@ if __name__ == "__main__":
     if request.type == plasma.PLASMA_REGISTER:
       address = ".".join(map(str, request.addr[:]))
       conn = Connection(address=address, port=request.port)
-      print "object manager " + str(conn) + " connected"
+      print("object manager " + str(conn) + " connected")
       object_managers.append(conn)
       for c in object_managers:
         send_addresses(c, object_managers)
-    elif request.type == plasma.PLASMA_GET_MANAGER_PORT:
-      port = object_managers[request.manager_id].port
-      req = plasma.PlasmaRequest(type=plasma.PLASMA_RETURN_MANAGER_PORT, port=port)
-      client.send(buffer(req)[:])
     else:
       raise Exception("This code should be unreachable.")
