@@ -28,8 +28,7 @@ matrix:
         - sudo apt-get update -qq
         - sudo apt-get install -qq clang-format-3.8
       script:
-        - .travis/git-clang-format --binary clang-format-3.8 --commit $TRAVIS_BUILD_DIR > __clang-format-output
-        - .travis/check-git-clang-format __clang-format-output
+        - .travis/check-git-clang-format-output.sh
 
 install:
   - make
