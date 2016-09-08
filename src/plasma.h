@@ -64,21 +64,21 @@ typedef struct {
 
 typedef struct {
   plasma_id object_id;
-  void* data;
+  void *data;
   int64_t size;
   int writable;
 } plasma_buffer;
 
 /* Connect to the local plasma store UNIX domain socket */
-int plasma_store_connect(const char* socket_name);
+int plasma_store_connect(const char *socket_name);
 
 /* Connect to a possibly remote plasma manager */
-int plasma_manager_connect(const char* addr, int port);
+int plasma_manager_connect(const char *addr, int port);
 
-void plasma_create(int store, plasma_id object_id, int64_t size, void** data);
-void plasma_get(int store, plasma_id object_id, int64_t* size, void** data);
+void plasma_create(int store, plasma_id object_id, int64_t size, void **data);
+void plasma_get(int store, plasma_id object_id, int64_t *size, void **data);
 void plasma_seal(int store, plasma_id object_id);
 
-void plasma_send(int conn, plasma_request* req);
+void plasma_send(int conn, plasma_request *req);
 
 #endif

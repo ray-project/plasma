@@ -87,7 +87,7 @@ int create_buffer(int64_t size) {
     LOG_ERR("unlink error");
     return -1;
   }
-  if (ftruncate(fd, (off_t)size) != 0) {
+  if (ftruncate(fd, (off_t) size) != 0) {
     LOG_ERR("ftruncate error");
     return -1;
   }
@@ -109,7 +109,7 @@ void create_object(int conn, plasma_request* req) {
   entry->fd = fd;
   HASH_ADD(handle, open_objects, object_id, sizeof(plasma_id), entry);
   plasma_reply reply = {PLASMA_OBJECT, req->size};
-  send_fd(conn, fd, (char*)&reply, sizeof(plasma_reply));
+  send_fd(conn, fd, (char*) &reply, sizeof(plasma_reply));
 }
 
 /* Get an object from the hash table. */
@@ -118,7 +118,7 @@ void get_object(int conn, plasma_request* req) {
   HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(plasma_id), entry);
   if (entry) {
     plasma_reply reply = {PLASMA_OBJECT, entry->info.size};
-    send_fd(conn, entry->fd, (char*)&reply, sizeof(plasma_reply));
+    send_fd(conn, entry->fd, (char*) &reply, sizeof(plasma_reply));
   } else {
     LOG_INFO("object not in hash table of sealed objects");
     int fd[2];
@@ -130,7 +130,7 @@ void get_object(int conn, plasma_request* req) {
     HASH_ADD(handle, objects_notify, object_id, sizeof(plasma_id),
              notify_entry);
     plasma_reply reply = {PLASMA_FUTURE, -1};
-    send_fd(conn, fd[1], (char*)&reply, sizeof(plasma_reply));
+    send_fd(conn, fd[1], (char*) &reply, sizeof(plasma_reply));
   }
 }
 
@@ -155,7 +155,7 @@ void seal_object(int conn, plasma_request* req) {
   }
   plasma_reply reply = {PLASMA_OBJECT, size};
   for (int i = 0; i < notify_entry->num_waiting; ++i) {
-    send_fd(notify_entry->conn[i], fd, (char*)&reply, sizeof(plasma_reply));
+    send_fd(notify_entry->conn[i], fd, (char*) &reply, sizeof(plasma_reply));
     close(notify_entry->conn[i]);
   }
   HASH_DELETE(handle, objects_notify, notify_entry);
@@ -231,13 +231,13 @@ void start_server(char* socket_name) {
     exit(-1);
   }
   int on = 1;
-  if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*)&on, sizeof(on)) < 0) {
+  if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*) &on, sizeof(on)) < 0) {
     LOG_ERR("setsockopt failed");
     close(fd);
     exit(-1);
   }
   /* TODO(pcm): http://stackoverflow.com/q/1150635 */
-  if (ioctl(fd, FIONBIO, (char*)&on) < 0) {
+  if (ioctl(fd, FIONBIO, (char*) &on) < 0) {
     LOG_ERR("ioctl failed");
     close(fd);
     exit(-1);
@@ -247,7 +247,7 @@ void start_server(char* socket_name) {
   addr.sun_family = AF_UNIX;
   strncpy(addr.sun_path, socket_name, sizeof(addr.sun_path) - 1);
   unlink(socket_name);
-  bind(fd, (struct sockaddr*)&addr, sizeof(addr));
+  bind(fd, (struct sockaddr*) &addr, sizeof(addr));
   listen(fd, 5);
   run_event_loop(fd);
 }

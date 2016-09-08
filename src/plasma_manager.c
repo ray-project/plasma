@@ -215,13 +215,13 @@ void start_server(const char* store_socket_name,
   name.sin_addr.s_addr = htonl(INADDR_ANY);
   int on = 1;
   /* TODO(pcm): http://stackoverflow.com/q/1150635 */
-  if (ioctl(sock, FIONBIO, (char*)&on) < 0) {
+  if (ioctl(sock, FIONBIO, (char*) &on) < 0) {
     LOG_ERR("ioctl failed");
     close(sock);
     exit(-1);
   }
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-  if (bind(sock, (struct sockaddr*)&name, sizeof(name)) < 0) {
+  if (bind(sock, (struct sockaddr*) &name, sizeof(name)) < 0) {
     LOG_ERR("could not bind socket");
     exit(-1);
   }

@@ -14,10 +14,10 @@
 
 #include "plasma.h"
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   int conn = -1;
   int64_t size;
-  void* data;
+  void *data;
   int c;
   plasma_id id = {{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
                    255, 255, 255, 255, 255, 255, 255, 255}};
