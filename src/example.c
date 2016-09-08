@@ -8,7 +8,7 @@
  * ./example -s /tmp/plasma_socket -c -f */
 
 #include <stdlib.h> 
-#include <getopt.h>
+#include <getopt.h> 
 #include <unistd.h>
 #include <assert.h>
 

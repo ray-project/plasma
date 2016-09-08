@@ -1,6 +1,13 @@
 #!/bin/bash
-echo "Running clang-format against branch $TRAVIS_BRANCH, with hash $(git rev-parse $TRAVIS_BRANCH)"
-output="$(.travis/git-clang-format --binary clang-format-4.0 --commit $TRAVIS_BRANCH --diff)"
+if [ "x$TRAVIS_PULL_REQUEST" == "x" ] ; then
+  # Not in a pull request, so compare against parent commit
+  base_commit = "HEAD^"
+  echo "Running clang-format against parent commit $(git rev-parse $base_commit)"
+else
+  base_commit = "$TRAVIS_BRANCH"
+  echo "Running clang-format against branch $base_commit, with hash $(git rev-parse $base_commit)"
+fi
+output="$(.travis/git-clang-format --binary clang-format-3.8 --commit $base_commit --diff)"
 if [ "$output" == "no modified files to format" ] || [ "$output" == "clang-format did not modify any files" ] ; then
   echo "clang-format passed."
   exit 0
