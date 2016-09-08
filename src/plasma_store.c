@@ -1,13 +1,13 @@
-// PLASMA STORE: This is a simple object store server process
-//
-// It accepts incoming client connections on a unix domain socket
-// (name passed in via the -s option of the executable) and uses a
-// single thread to serve the clients. Each client establishes a
-// connection and can create objects, wait for objects and seal
-// objects through that connection.
-//
-// It keeps a hash table that maps object_ids (which are 20 byte long,
-// just enough to store and SHA1 hash) to memory mapped files.
+/* PLASMA STORE: This is a simple object store server process
+ *
+ * It accepts incoming client connections on a unix domain socket
+ * (name passed in via the -s option of the executable) and uses a
+ * single thread to serve the clients. Each client establishes a
+ * connection and can create objects, wait for objects and seal
+ * objects through that connection.
+ *
+ * It keeps a hash table that maps object_ids (which are 20 byte long,
+ * just enough to store and SHA1 hash) to memory mapped files. */
 
 
 #include <stdio.h>
@@ -39,39 +39,39 @@ void init_state(plasma_store_state* s) {
 }
 
 typedef struct {
-  // Object id of this object.
+  /* Object id of this object. */
   plasma_id object_id;
-  // Object info like size, creation time and owner.
+  /* Object info like size, creation time and owner. */
   plasma_object_info info;
-  // Memory mapped file containing the object.
+  /* Memory mapped file containing the object. */
   int fd;
-  // Handle for the uthash table.
+  /* Handle for the uthash table. */
   UT_hash_handle handle;
 } object_table_entry;
 
-// objects that are still being written by their owner process
+/* Objects that are still being written by their owner process. */
 object_table_entry* open_objects = NULL;
 
-// Objects that have already been sealed by their owner process and
-// can now be shared with other processes.
+/* Objects that have already been sealed by their owner process and
+ * can now be shared with other processes. */
 object_table_entry* sealed_objects = NULL;
 
 typedef struct {
-  // Object id of this object.
+  /* Object id of this object. */
   plasma_id object_id;
-  // Number of processes waiting for the object.
+  /* Number of processes waiting for the object. */
   int num_waiting;
-  // Socket connections to waiting clients.
+  /* Socket connections to waiting clients. */
   int conn[MAX_NUM_CLIENTS];
-  // Handle for the uthash table.
+  /* Handle for the uthash table. */
   UT_hash_handle handle;
 } object_notify_entry;
 
-// Objects that processes are waiting for.
+/* Objects that processes are waiting for. */
 object_notify_entry* objects_notify = NULL;
 
-// Create a buffer. This is creating a temporary file and then
-// immediately unlinking it so we do not leave traces in the system.
+/* Create a buffer. This is creating a temporary file and then
+ * immediately unlinking it so we do not leave traces in the system. */
 int create_buffer(int64_t size) {
   static char template[] = "/tmp/plasmaXXXXXX";
   char file_name[32];
@@ -95,9 +95,9 @@ int create_buffer(int64_t size) {
   return fd;
 }
 
-// Create a new object buffer in the hash table.
+/* Create a new object buffer in the hash table. */
 void create_object(int conn, plasma_request* req) {
-  LOG_INFO("creating object"); // TODO(pcm): add object_id here
+  LOG_INFO("creating object"); /* TODO(pcm): add object_id here */
   int fd = create_buffer(req->size);
   if (fd < 0) {
     LOG_ERR("could not create shared memory buffer");
@@ -106,14 +106,14 @@ void create_object(int conn, plasma_request* req) {
   object_table_entry *entry = malloc(sizeof(object_table_entry));
   memcpy(&entry->object_id, &req->object_id, 20);
   entry->info.size = req->size;
-  // TODO(pcm): set the other fields
+  /* TODO(pcm): set the other fields */
   entry->fd = fd;
   HASH_ADD(handle, open_objects, object_id, sizeof(plasma_id), entry);
   plasma_reply reply = { PLASMA_OBJECT, req->size };
   send_fd(conn, fd, (char*) &reply, sizeof(plasma_reply));
 }
 
-// Get an object from the hash table.
+/* Get an object from the hash table. */
 void get_object(int conn, plasma_request* req) {
   object_table_entry *entry;
   HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(plasma_id), entry);
@@ -134,19 +134,19 @@ void get_object(int conn, plasma_request* req) {
   }
 }
 
-// Seal an object that has been created in the hash table.
+/* Seal an object that has been created in the hash table. */
 void seal_object(int conn, plasma_request* req) {
   LOG_INFO("sealing object"); // TODO(pcm): add object_id here
   object_table_entry *entry;
   HASH_FIND(handle, open_objects, &req->object_id, sizeof(plasma_id), entry);
   if (!entry) {
-    return; // TODO(pcm): return error
+    return; /* TODO(pcm): return error */
   }
   HASH_DELETE(handle, open_objects, entry);
   int64_t size = entry->info.size;
   int fd = entry->fd;
   HASH_ADD(handle, sealed_objects, object_id, sizeof(plasma_id), entry);
-  // Inform processes that the object is ready now.
+  /* Inform processes that the object is ready now. */
   object_notify_entry* notify_entry;
   HASH_FIND(handle, objects_notify, &req->object_id, sizeof(plasma_id), notify_entry);
   if (!notify_entry) {
@@ -195,7 +195,7 @@ void run_event_loop(int socket) {
         continue;
       if (waiting->fd == socket) {
         while (1) {
-          // Handle new incoming connections.
+          /* Handle new incoming connections. */
           int new_socket = accept(socket, NULL, NULL);
           if (new_socket < 0) {
             if (errno != EWOULDBLOCK) {
@@ -235,7 +235,7 @@ void start_server(char* socket_name) {
     close(fd);
     exit(-1);
   }
-  // TODO(pcm): http://stackoverflow.com/q/1150635
+  /* TODO(pcm): http://stackoverflow.com/q/1150635 */
   if (ioctl(fd, FIONBIO, (char*) &on) < 0) {
     LOG_ERR("ioctl failed");
     close(fd);

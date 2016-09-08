@@ -62,8 +62,8 @@ void initiate_transfer(plasma_manager_state* s, plasma_request* req) {
 }
 
 /* Start reading data from another object manager.
-   Initializes the object we are going to write to in the
-   local plasma store and then switches the data socket to reading mode. */
+ * Initializes the object we are going to write to in the
+ * local plasma store and then switches the data socket to reading mode. */
 void start_reading_data(int64_t index, plasma_manager_state* s, plasma_request* req) {
   int store_conn = plasma_store_connect(s->store_socket_name);
   plasma_buffer buf = { .object_id = req->object_id, .size = req->size, .writable = 1 };
