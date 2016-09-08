@@ -24,41 +24,18 @@
 #include "uthash.h"
 #include "fling.h"
 #include "plasma.h"
+#include "event_loop.h"
 
-#define MAX_NUM_CLIENTS 2048
+#define MAX_NUM_CLIENTS 100000
 
 typedef struct {
-  // Number of clients connected.
-  int num_clients;
-  // Unique identifier for the clients.
-  int client_id[MAX_NUM_CLIENTS];
-  // Data structure for polling.
-  struct pollfd waiting[MAX_NUM_CLIENTS];
+  /* Event loop for the plasma store. */
+  event_loop *loop;
 } plasma_store_state;
 
 void init_state(plasma_store_state* s) {
-  memset(&s->waiting, 0, sizeof(s->waiting));
-  memset(&s->client_id, 0, sizeof(s->client_id));
-  s->num_clients = 0;
-}
-
-int add_client(plasma_store_state* s, int fd) {
-  static int curr_id = 0;
-  s->waiting[s->num_clients].fd = fd;
-  s->waiting[s->num_clients].events = POLLIN;
-  s->client_id[s->num_clients] = curr_id;
-  s->num_clients += 1;
-  return curr_id++;
-}
-
-// Remove the client at index i by swapping it with the
-// client at index num_clients-1 and zeroing the latter out.
-void remove_client(plasma_store_state* s, int i) {
-  memcpy(&s->waiting[i], &s->waiting[s->num_clients-1], sizeof(struct pollfd));
-  memset(&s->waiting[s->num_clients-1], 0, sizeof(struct pollfd));
-  s->client_id[i] = s->client_id[s->num_clients-1];
-  s->client_id[s->num_clients-1] = 0;
-  s->num_clients -= 1;
+  s->loop = malloc(sizeof(event_loop));
+  event_loop_init(s->loop);
 }
 
 typedef struct {
@@ -178,6 +155,7 @@ void seal_object(int conn, plasma_request* req) {
   plasma_reply reply = { PLASMA_OBJECT, size };
   for (int i = 0; i < notify_entry->num_waiting; ++i) {
     send_fd(notify_entry->conn[i], fd, (char*) &reply, sizeof(plasma_reply));
+    close(notify_entry->conn[i]);
   }
   HASH_DELETE(handle, objects_notify, notify_entry);
   free(notify_entry);
@@ -200,21 +178,22 @@ void process_event(int conn, plasma_request* req) {
   }
 }
 
-void event_loop(int socket) {
+void run_event_loop(int socket) {
   plasma_store_state state;
   init_state(&state);
-  add_client(&state, socket);
+  event_loop_attach(state.loop, 0, NULL, socket, POLLIN);
   plasma_request req;
   while (1) {
-    int num_ready = poll(state.waiting, state.num_clients, -1);
+    int num_ready = event_loop_poll(state.loop);
     if (num_ready < 0) {
       LOG_ERR("poll failed");
       exit(-1);
     }
-    for (int i = 0; i < state.num_clients; ++i) {
-      if (state.waiting[i].revents == 0)
+    for (int i = 0; i < event_loop_size(state.loop); ++i) {
+      struct pollfd *waiting = event_loop_get(state.loop, i);
+      if (waiting->revents == 0)
         continue;
-      if (state.waiting[i].fd == socket) {
+      if (waiting->fd == socket) {
         while (1) {
           // Handle new incoming connections.
           int new_socket = accept(socket, NULL, NULL);
@@ -225,19 +204,19 @@ void event_loop(int socket) {
             }
             break;
           }
-          int client_id = add_client(&state, new_socket);
-          LOG_INFO("adding new client with id %d", client_id);
+          event_loop_attach(state.loop, 0, NULL, new_socket, POLLIN);
+          LOG_INFO("adding new client");
         }
       } else {
-        int r = read(state.waiting[i].fd, &req, sizeof(plasma_request));
+        int r = read(waiting->fd, &req, sizeof(plasma_request));
         if (r == -1) {
           LOG_ERR("read error");
           continue;
         } else if (r == 0) {
-          LOG_INFO("client with id %d disconnected", state.client_id[i]);
-          remove_client(&state, i);
+          LOG_INFO("connection %d disconnected", i);
+          event_loop_detach(state.loop, i, 1);
         } else {
-          process_event(state.waiting[i].fd, &req);
+          process_event(waiting->fd, &req);
         }
       }
     }
@@ -269,7 +248,7 @@ void start_server(char* socket_name) {
   unlink(socket_name);
   bind(fd, (struct sockaddr*)&addr, sizeof(addr));
   listen(fd, 5);
-  event_loop(fd);
+  run_event_loop(fd);
 }
 
 int main(int argc, char* argv[]) {
