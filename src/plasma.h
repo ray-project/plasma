@@ -7,15 +7,15 @@
 #include <string.h>
 
 #ifdef NDEBUG
-  #define LOG_DEBUG(M, ...)
+#define LOG_DEBUG(M, ...)
 #else
-  #define LOG_DEBUG(M, ...) \
-    fprintf(stderr, "[DEBUG] (%s:%d) " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#define LOG_DEBUG(M, ...) \
+  fprintf(stderr, "[DEBUG] (%s:%d) " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 #endif
 
-#define LOG_ERR(M, ...) \
-  fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", \
-    __FILE__, __LINE__, errno == 0 ? "None" : strerror(errno), ##__VA_ARGS__)
+#define LOG_ERR(M, ...)                                                     \
+  fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, \
+          errno == 0 ? "None" : strerror(errno), ##__VA_ARGS__)
 
 #define LOG_INFO(M, ...) \
   fprintf(stderr, "[INFO] (%s:%d) " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
@@ -27,9 +27,7 @@ typedef struct {
 } plasma_object_info;
 
 /* Represents an object id hash, can hold a full SHA1 hash */
-typedef struct {
-  unsigned char id[20];
-} plasma_id;
+typedef struct { unsigned char id[20]; } plasma_id;
 
 enum plasma_request_type {
   /* Create a new object. */
@@ -66,7 +64,7 @@ typedef struct {
 
 typedef struct {
   plasma_id object_id;
-  void *data;
+  void* data;
   int64_t size;
   int writable;
 } plasma_buffer;
@@ -77,10 +75,10 @@ int plasma_store_connect(const char* socket_name);
 /* Connect to a possibly remote plasma manager */
 int plasma_manager_connect(const char* addr, int port);
 
-void plasma_create(int store, plasma_id object_id, int64_t size, void **data);
-void plasma_get(int store, plasma_id object_id, int64_t *size, void **data);
+void plasma_create(int store, plasma_id object_id, int64_t size, void** data);
+void plasma_get(int store, plasma_id object_id, int64_t* size, void** data);
 void plasma_seal(int store, plasma_id object_id);
 
-void plasma_send(int conn, plasma_request *req);
+void plasma_send(int conn, plasma_request* req);
 
 #endif
