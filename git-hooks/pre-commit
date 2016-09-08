@@ -1,2 +1,0 @@
-#!/bin/bash
-git-hooks/pre-commit-clang-format || exit 1
