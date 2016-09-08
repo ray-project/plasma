@@ -19,8 +19,8 @@ int main(int argc, char *argv[]) {
   int64_t size;
   void *data;
   int c;
-  plasma_id id = {{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-                   255, 255, 255, 255, 255, 255, 255, 255}};
+  plasma_id id = {{255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+                   255, 255, 255, 255, 255, 255, 255, 255, 255, 255}};
   while ((c = getopt(argc, argv, "s:cfg")) != -1) {
     switch (c) {
     case 's':
