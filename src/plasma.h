@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stddef.h>
 #include <string.h>
 
 #ifdef NDEBUG
@@ -59,7 +60,9 @@ enum plasma_reply_type {
 
 typedef struct {
   int type;
-  int64_t size;
+  ptrdiff_t offset;
+  int64_t map_size;
+  int64_t object_size;
 } plasma_reply;
 
 typedef struct {
