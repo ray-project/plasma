@@ -23,12 +23,15 @@
 #include "event_loop.h"
 #include "plasma.h"
 #include "plasma_manager.h"
+#include "plasma_directory.h"
 
 typedef struct {
   /* Name of the socket connecting to local plasma store. */
-  const char* store_socket_name;
+  const char *store_socket_name;
   /* Event loop. */
-  event_loop* loop;
+  event_loop *loop;
+  /* Plasma directory */
+  plasma_directory directory;
 } plasma_manager_state;
 
 /* Initialize the plasma manager. This function initializes the event loop
@@ -50,10 +53,10 @@ void initiate_transfer(plasma_manager_state* s, plasma_request* req) {
   
   char ip_addr[16];
   snprintf(ip_addr, 32, "%d.%d.%d.%d",
-                    req->addr[0], req->addr[1],
-                    req->addr[2], req->addr[3]);
+                    req->addr.addr[0], req->addr.addr[1],
+                    req->addr.addr[2], req->addr.addr[3]);
 
-  int fd = plasma_manager_connect(&ip_addr[0], req->port);
+  int fd = plasma_manager_connect(&ip_addr[0], req->addr.port);
   data_connection conn = { .type = DATA_CONNECTION_WRITE,  .store_conn = store_conn, .buf = buf, .cursor = 0 };
   event_loop_attach(s->loop, CONNECTION_DATA, &conn, fd, POLLOUT);
 
@@ -77,12 +80,16 @@ void start_reading_data(int64_t index, plasma_manager_state* s, plasma_request* 
 void process_command(int64_t id, plasma_manager_state* state, plasma_request* req) {
   switch (req->type) {
   case PLASMA_TRANSFER:
-    LOG_INFO("transfering object to manager with port %d", req->port);
+    LOG_INFO("transfering object to manager with port %d", req->addr.port);
     initiate_transfer(state, req);
     break;
   case PLASMA_DATA:
     LOG_INFO("starting to stream data");
     start_reading_data(id, state, req);
+    break;
+  case PLASMA_LINK:
+    LOG_INFO("putting link into the plasma directory");
+    plasma_directory_link(&state->directory, req->object_id);
     break;
   default:
     LOG_ERR("invalid request %d", req->type);
@@ -154,7 +161,6 @@ void read_from_socket(plasma_manager_state* state, struct pollfd *waiting, int64
 /* Main event loop of the plasma manager. */
 void run_event_loop(int sock, plasma_manager_state* s) {
   /* Add listening socket. */
-  event_loop_attach(s->loop, CONNECTION_LISTENER, NULL, sock, POLLIN);
   plasma_request req;
   while (1) {
     int num_ready = event_loop_poll(s->loop);
@@ -166,7 +172,9 @@ void run_event_loop(int sock, plasma_manager_state* s) {
       struct pollfd *waiting = event_loop_get(s->loop, i);
       if (waiting->revents == 0)
         continue;
-      if (waiting->fd == sock) {
+      if (i == 0) {
+        plasma_directory_event(&s->directory);
+      } else if (waiting->fd == sock) {
         /* Handle new incoming connections. */
         int new_socket = accept(sock, NULL, NULL);
         if (new_socket < 0) {
@@ -186,7 +194,7 @@ void run_event_loop(int sock, plasma_manager_state* s) {
   }
 }
 
-void start_server(const char *store_socket_name, const char* master_addr, int port) {
+void start_server(const char *store_socket_name, const char* manager_addr, int manager_port, const char* redis_addr, int redis_port) {
   struct sockaddr_in name;
   int sock = socket(PF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
@@ -194,7 +202,7 @@ void start_server(const char *store_socket_name, const char* master_addr, int po
     exit(-1);
   }
   name.sin_family = AF_INET;
-  name.sin_port = htons(port);
+  name.sin_port = htons(manager_port);
   name.sin_addr.s_addr = htonl(INADDR_ANY);
   int on = 1;
   /* TODO(pcm): http://stackoverflow.com/q/1150635 */
@@ -208,34 +216,43 @@ void start_server(const char *store_socket_name, const char* master_addr, int po
     LOG_ERR("could not bind socket");
     exit(-1);
   }
-  LOG_INFO("listening on port %d", port);
+  LOG_INFO("listening on port %d", manager_port);
   if (listen(sock, 5) == -1) {
     LOG_ERR("could not listen to socket");
     exit(-1);
   }
   plasma_manager_state state;
   init_plasma_manager(&state, store_socket_name);
+  plasma_directory_init(&state.directory, manager_addr, manager_port, redis_addr, redis_port);
+  event_loop_attach(state.loop, CONNECTION_LISTENER, NULL, sock, POLLIN);
+  int redis_conn = plasma_directory_attach(&state.directory);
+  event_loop_attach(state.loop, CONNECTION_REDIS, NULL, redis_conn, 0);
   run_event_loop(sock, &state);
 }
 
 int main(int argc, char* argv[]) {
   /* Socket name of the plasma store this manager is connected to. */
   char *store_socket_name = NULL;
+  /* IP address and port of redis. */
+  char *redis_addr_port = NULL;
   /* IP address of this node. */
-  char *master_addr = NULL;
+  char *manager_addr = NULL;
   /* Port number the manager should use. */
-  int port;
+  int manager_port;
   int c;
-  while ((c = getopt(argc, argv, "s:m:p:")) != -1) {
+  while ((c = getopt(argc, argv, "s:m:p:r:")) != -1) {
     switch (c) {
     case 's':
       store_socket_name = optarg;
       break;
     case 'm':
-      master_addr = optarg;
+      manager_addr = optarg;
       break;
     case 'p':
-      port = atoi(optarg);
+      manager_port = atoi(optarg);
+      break;
+    case 'r':
+      redis_addr_port = optarg;
       break;
     default:
       LOG_ERR("unknown option %c", c);
@@ -246,9 +263,15 @@ int main(int argc, char* argv[]) {
     LOG_ERR("please specify socket for connecting to the plasma store with -s switch");
     exit(-1);
   }
-  if (!master_addr) {
+  if (!manager_addr) {
     LOG_ERR("please specify ip address of the current host in the format 123.456.789.10 with -m switch");
     exit(-1);
   }
-  start_server(store_socket_name, master_addr, port);
+  char redis_addr[16] = { 0 };
+  char redis_port[6] = { 0 };
+  if(!redis_addr_port || sscanf(redis_addr_port, "%15[0-9.]:%5[0-9]", redis_addr, redis_port) != 2) {
+    LOG_ERR("need to specify redis address like 127.0.0.1:6379 with -r switch");
+    exit(-1);
+  }
+  start_server(store_socket_name, manager_addr, manager_port, &redis_addr[0], atoi(redis_port));
 }

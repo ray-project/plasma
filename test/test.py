@@ -76,8 +76,8 @@ class TestPlasmaManager(unittest.TestCase):
     self.port1 = random.randint(10000, 50000)
     self.port2 = random.randint(10000, 50000)
     plasma_manager_executable = os.path.join(os.path.abspath(os.path.dirname(__file__)), "../build/plasma_manager")
-    self.p4 = subprocess.Popen([plasma_manager_executable, "-s", store_name1, "-m", "127.0.0.1", "-p", str(self.port1)])
-    self.p5 = subprocess.Popen([plasma_manager_executable, "-s", store_name2, "-m", "127.0.0.1", "-p", str(self.port2)])
+    self.p4 = subprocess.Popen([plasma_manager_executable, "-s", store_name1, "-m", "127.0.0.1", "-p", str(self.port1), "-r", "127.0.0.1:6379"])
+    self.p5 = subprocess.Popen([plasma_manager_executable, "-s", store_name2, "-m", "127.0.0.1", "-p", str(self.port2), "-r", "127.0.0.1:6379"])
     time.sleep(0.1)
     # Connect two PlasmaClients.
     self.client1 = plasma.PlasmaClient(store_name1, "127.0.0.1", self.port1)

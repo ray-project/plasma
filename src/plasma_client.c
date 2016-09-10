@@ -121,12 +121,18 @@ int plasma_manager_connect(const char* ip_addr, int port) {
 }
 
 void plasma_transfer(int manager, const char* addr, int port, plasma_id object_id) {
-  plasma_request req = {.type = PLASMA_TRANSFER, .object_id = object_id, .port = port};
+  plasma_request req = {.type = PLASMA_TRANSFER, .object_id = object_id };
   char* end = NULL;
   for (int i = 0; i < 4; ++i) {
-    req.addr[i] = strtol(end ? end : addr, &end, 10);
+    req.addr.addr[i] = strtol(end ? end : addr, &end, 10);
     /* skip the '.' */
     end += 1;
   }
+  req.addr.port = port;
+  plasma_send(manager, &req);
+}
+
+void plasma_link(int manager, plasma_id object_id) {
+  plasma_request req = {.type = PLASMA_LINK, .object_id = object_id};
   plasma_send(manager, &req);
 }

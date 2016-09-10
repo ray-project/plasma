@@ -45,6 +45,12 @@ class PlasmaClient(object):
     self.client.plasma_seal.argtypes = [ctypes.c_int, PlasmaID]
     self.client.plasma_seal.restype = None
 
+    self.client.plasma_transfer.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, PlasmaID]
+    self.client.plasma_transfer.restype = None
+
+    self.client.plasma_link.argtypes = [ctypes.c_int, PlasmaID]
+    self.client.plasma_link.resype = None
+
     self.buffer_from_memory = ctypes.pythonapi.PyBuffer_FromMemory
     self.buffer_from_memory.argtypes = [ctypes.c_void_p, ctypes.c_int64]
     self.buffer_from_memory.restype = ctypes.py_object
@@ -70,7 +76,10 @@ class PlasmaClient(object):
       size (int): The size in bytes of the created buffer.
     """
     data = ctypes.c_void_p()
-    self.client.plasma_create(self.sock, make_plasma_id(object_id), size, ctypes.byref(data))
+    plasma_id = make_plasma_id(object_id)
+    self.client.plasma_create(self.sock, plasma_id, size, ctypes.byref(data))
+    if self.manager_conn != -1:
+      self.client.plasma_link(self.manager_conn, plasma_id)
     return self.buffer_from_read_write_memory(data, size)
 
   def get(self, object_id):
