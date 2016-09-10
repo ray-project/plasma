@@ -96,8 +96,13 @@ void create_object(int conn, plasma_request* req) {
   entry->map_size = map_size;
   entry->offset = offset;
   HASH_ADD(handle, open_objects, object_id, sizeof(plasma_id), entry);
-  plasma_reply reply = {PLASMA_OBJECT, offset, map_size, req->size};
-  send_fd(conn, fd, (char*) &reply, sizeof(plasma_reply));
+  plasma_reply reply;
+  memset(&reply, 0, sizeof(reply));
+  reply.type = PLASMA_OBJECT;
+  reply.offset = offset;
+  reply.map_size = map_size;
+  reply.object_size = req->size;
+  send_fd(conn, fd, (char*) &reply, sizeof(reply));
 }
 
 /* Get an object from the hash table. */

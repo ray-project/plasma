@@ -14,12 +14,16 @@
   fprintf(stderr, "[DEBUG] (%s:%d) " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 #endif
 
+#ifdef PLASMA_LOGGIN_ON
+#define LOG_INFO(M, ...) \
+  fprintf(stderr, "[INFO] (%s:%d) " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#else
+#define LOG_INFO(M, ...)
+#endif
+
 #define LOG_ERR(M, ...)                                                     \
   fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, \
           errno == 0 ? "None" : strerror(errno), ##__VA_ARGS__)
-
-#define LOG_INFO(M, ...) \
-  fprintf(stderr, "[INFO] (%s:%d) " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 
 typedef struct {
   int64_t size;
