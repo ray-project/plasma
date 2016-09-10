@@ -224,9 +224,10 @@ void start_server(const char *store_socket_name, const char* manager_addr, int m
   plasma_manager_state state;
   init_plasma_manager(&state, store_socket_name);
   plasma_directory_init(&state.directory, manager_addr, manager_port, redis_addr, redis_port);
+  int redis_conn = plasma_directory_attach(&state.directory, state.loop);
+  int64_t index = event_loop_attach(state.loop, CONNECTION_REDIS, NULL, redis_conn, POLLIN | POLLOUT);
+  assert(index == 0);
   event_loop_attach(state.loop, CONNECTION_LISTENER, NULL, sock, POLLIN);
-  int redis_conn = plasma_directory_attach(&state.directory);
-  event_loop_attach(state.loop, CONNECTION_REDIS, NULL, redis_conn, 0);
   run_event_loop(sock, &state);
 }
 

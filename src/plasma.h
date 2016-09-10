@@ -58,6 +58,7 @@ typedef struct {
   int port;
 } plasma_addr;
 
+// TODO(pcm): make this platform independent, see http://stackoverflow.com/a/8001279
 typedef struct {
   int type;
   plasma_id object_id;
