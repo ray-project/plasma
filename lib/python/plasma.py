@@ -25,12 +25,18 @@ class PlasmaClient(object):
 
   def __init__(self, socket_name, addr=None, port=None):
     """Initialize the PlasmaClient.
-    
+
     Args:
       socket_name (str): Name of the socket the plasma store is listening at.
       addr (str): IPv4 address of plasma manager attached to the plasma store.
       port (int): Port number of the plasma manager attached to the plasma store.
     """
+    if port is not None:
+      if not isinstance(port, int):
+        raise Exception("The 'port' argument must be an integer. The given argument has type {}.".format(type(port)))
+      if not 0 < port < 65536:
+        raise Exception("The 'port' argument must be greater than 0 and less than 65536. The given value is {}.".format(port))
+
     plasma_client_library = os.path.join(os.path.abspath(os.path.dirname(__file__)), "../../build/plasma_client.so")
     self.client = ctypes.cdll.LoadLibrary(plasma_client_library)
 
@@ -100,7 +106,7 @@ class PlasmaClient(object):
 
   def transfer(self, addr, port, object_id):
     """Transfer local object with id object_id to another plasma instance
-    
+
     Args:
       addr (str): IPv4 address of the plasma instance the object is sent to.
       port (int): Port number of the plasma instance the object is sent to.
@@ -109,4 +115,3 @@ class PlasmaClient(object):
     if self.manager_conn == -1:
       raise Exception("Not connected to the plasma manager socket")
     self.client.plasma_transfer(self.manager_conn, addr, port, make_plasma_id(object_id))
-    
