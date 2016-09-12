@@ -25,7 +25,7 @@ class PlasmaClient(object):
 
   def __init__(self, socket_name, addr=None, port=None):
     """Initialize the PlasmaClient.
-    
+
     Args:
       socket_name (str): Name of the socket the plasma store is listening at.
       addr (str): IPv4 address of plasma manager attached to the plasma store.
@@ -96,11 +96,12 @@ class PlasmaClient(object):
     Args:
       object_id (str): A string used to identify an object.
     """
+
     self.client.plasma_seal(self.sock, make_plasma_id(object_id))
 
   def transfer(self, addr, port, object_id):
     """Transfer local object with id object_id to another plasma instance
-    
+
     Args:
       addr (str): IPv4 address of the plasma instance the object is sent to.
       port (int): Port number of the plasma instance the object is sent to.
@@ -109,4 +110,3 @@ class PlasmaClient(object):
     if self.manager_conn == -1:
       raise Exception("Not connected to the plasma manager socket")
     self.client.plasma_transfer(self.manager_conn, addr, port, make_plasma_id(object_id))
-    
