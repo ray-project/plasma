@@ -47,7 +47,7 @@ void init_plasma_manager(plasma_manager_state* s,
 void initiate_transfer(plasma_manager_state* s, plasma_request* req) {
   int store_conn = plasma_store_connect(s->store_socket_name);
   plasma_buffer buf = {.object_id = req->object_id, .writable = 0};
-  plasma_get(store_conn, req->object_id, &buf.size, &buf.data);
+  plasma_get(store_conn, req->object_id, &buf.size, &buf.data, &buf.metadata_size, &buf.metadata);
 
   char ip_addr[32];
   snprintf(ip_addr, 32, "%d.%d.%d.%d", req->addr[0], req->addr[1], req->addr[2],
@@ -59,9 +59,8 @@ void initiate_transfer(plasma_manager_state* s, plasma_request* req) {
                           .buf = buf,
                           .cursor = 0};
   event_loop_attach(s->loop, CONNECTION_DATA, &conn, fd, POLLOUT);
-
   plasma_request manager_req = {
-      .type = PLASMA_DATA, .object_id = req->object_id, .size = buf.size};
+      .type = PLASMA_DATA, .object_id = req->object_id, .data_size = buf.size};
   plasma_send(fd, &manager_req);
 }
 
@@ -73,8 +72,9 @@ void start_reading_data(int64_t index,
                         plasma_request* req) {
   int store_conn = plasma_store_connect(s->store_socket_name);
   plasma_buffer buf = {
-      .object_id = req->object_id, .size = req->size, .writable = 1};
-  plasma_create(store_conn, req->object_id, req->size, &buf.data);
+      .object_id = req->object_id, .size = req->data_size, .writable = 1};
+  // TODO(rkn): Add the metadata below...
+  plasma_create(store_conn, req->object_id, req->data_size, NULL, 0, &buf.data);
   data_connection conn = {.type = DATA_CONNECTION_READ,
                           .store_conn = store_conn,
                           .buf = buf,

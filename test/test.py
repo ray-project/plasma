@@ -14,6 +14,9 @@ import plasma
 def random_object_id():
   return "".join([chr(random.randint(0, 255)) for _ in range(20)])
 
+def random_metadata(length):
+  return "".join([chr(random.randint(0, 255)) for _ in range(length)])
+
 class TestPlasmaClient(unittest.TestCase):
 
   def setUp(self):
@@ -32,7 +35,7 @@ class TestPlasmaClient(unittest.TestCase):
     # Create an object id string.
     object_id = random_object_id()
     # Create a new buffer and write to it.
-    length = 1000
+    length = 50
     memory_buffer = self.plasma_client.create(object_id, length)
     for i in range(length):
       memory_buffer[i] = chr(i % 256)
@@ -42,6 +45,28 @@ class TestPlasmaClient(unittest.TestCase):
     memory_buffer = self.plasma_client.get(object_id)
     for i in range(length):
       self.assertEqual(memory_buffer[i], chr(i % 256))
+
+  def test_create_with_metadata(self):
+    for length in range(1000):
+      # Create an object id string.
+      object_id = random_object_id()
+      # Create a random metadata string.
+      metadata = random_metadata(length)
+      # Create a new buffer and write to it.
+      memory_buffer = self.plasma_client.create(object_id, length, metadata)
+      for i in range(length):
+        memory_buffer[i] = chr(i % 256)
+      # Seal the object.
+      self.plasma_client.seal(object_id)
+      # Get the object.
+      memory_buffer = self.plasma_client.get(object_id)
+      for i in range(length):
+        self.assertEqual(memory_buffer[i], chr(i % 256))
+      # Get the metadata.
+      metadata_buffer = self.plasma_client.get_metadata(object_id)
+      self.assertEqual(len(metadata), len(metadata_buffer))
+      for i in range(len(metadata)):
+        self.assertEqual(metadata[i], metadata_buffer[i])
 
   def test_illegal_functionality(self):
     # Create an object id string.
