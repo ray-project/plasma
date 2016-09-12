@@ -96,8 +96,18 @@ int plasma_store_connect(const char *socket_name);
 /* Connect to a possibly remote plasma manager */
 int plasma_manager_connect(const char *addr, int port);
 
-void plasma_create(int conn, plasma_id object_id, int64_t size, uint8_t *metadata, int64_t metadata_size, uint8_t **data);
-void plasma_get(int conn, plasma_id object_id, int64_t *size, uint8_t **data, int64_t *metadata_size, uint8_t **metadata);
+void plasma_create(int conn,
+                   plasma_id object_id,
+                   int64_t size,
+                   uint8_t *metadata,
+                   int64_t metadata_size,
+                   uint8_t **data);
+void plasma_get(int conn,
+                plasma_id object_id,
+                int64_t *size,
+                uint8_t **data,
+                int64_t *metadata_size,
+                uint8_t **metadata);
 void plasma_seal(int store, plasma_id object_id);
 
 void plasma_send(int conn, plasma_request *req);

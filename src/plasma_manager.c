@@ -50,10 +50,12 @@ void initiate_transfer(plasma_manager_state* s, plasma_request* req) {
   int64_t data_size;
   uint8_t* metadata;
   int64_t metadata_size;
-  plasma_get(store_conn, req->object_id, &data_size, &data, &metadata_size, &metadata);
+  plasma_get(store_conn, req->object_id, &data_size, &data, &metadata_size,
+             &metadata);
   assert(metadata == data + data_size);
   plasma_buffer buf = {.object_id = req->object_id,
-                       .data = data, /* We treat this as a pointer to the concatenated data and metadata. */
+                       .data = data, /* We treat this as a pointer to the
+                                        concatenated data and metadata. */
                        .data_size = data_size,
                        .metadata_size = metadata_size,
                        .writable = 0};
@@ -86,7 +88,8 @@ void start_reading_data(int64_t index,
                        .metadata_size = req->metadata_size,
                        .writable = 1};
   // TODO(rkn): Add the metadata below...
-  plasma_create(store_conn, req->object_id, req->data_size, NULL, req->metadata_size, &buf.data);
+  plasma_create(store_conn, req->object_id, req->data_size, NULL,
+                req->metadata_size, &buf.data);
   data_connection conn = {.type = DATA_CONNECTION_READ,
                           .store_conn = store_conn,
                           .buf = buf,

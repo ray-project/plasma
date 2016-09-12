@@ -23,10 +23,20 @@ void plasma_send(int fd, plasma_request *req) {
   }
 }
 
-void plasma_create(int conn, plasma_id object_id, int64_t data_size, uint8_t *metadata, int64_t metadata_size, uint8_t **data) {
-  LOG_INFO("called plasma_create on conn %d with size %d and metadata size %d" PRId64, conn, size, metadata_size);
-  plasma_request req = {
-      .type = PLASMA_CREATE, .object_id = object_id, .data_size = data_size, .metadata_size = metadata_size};
+void plasma_create(int conn,
+                   plasma_id object_id,
+                   int64_t data_size,
+                   uint8_t *metadata,
+                   int64_t metadata_size,
+                   uint8_t **data) {
+  LOG_INFO(
+      "called plasma_create on conn %d with size %d and metadata size "
+      "%d" PRId64,
+      conn, size, metadata_size);
+  plasma_request req = {.type = PLASMA_CREATE,
+                        .object_id = object_id,
+                        .data_size = data_size,
+                        .metadata_size = metadata_size};
   plasma_send(conn, &req);
   plasma_reply reply;
   int fd = recv_fd(conn, (char *) &reply, sizeof(plasma_reply));
@@ -36,7 +46,8 @@ void plasma_create(int conn, plasma_id object_id, int64_t data_size, uint8_t *me
   /* The metadata should come right after the data. */
   assert(reply.metadata_offset == reply.data_offset + data_size);
   *data =
-      ((uint8_t*) mmap(NULL, reply.map_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)) +
+      ((uint8_t *) mmap(NULL, reply.map_size, PROT_READ | PROT_WRITE,
+                       MAP_SHARED, fd, 0)) +
       reply.data_offset;
   if (*data == MAP_FAILED) {
     LOG_ERR("mmap failed");
@@ -53,7 +64,12 @@ void plasma_create(int conn, plasma_id object_id, int64_t data_size, uint8_t *me
 }
 
 /* This method is used to get both the data and the metadata. */
-void plasma_get(int conn, plasma_id object_id, int64_t *size, uint8_t **data, int64_t *metadata_size, uint8_t **metadata) {
+void plasma_get(int conn,
+                plasma_id object_id,
+                int64_t *size,
+                uint8_t **data,
+                int64_t *metadata_size,
+                uint8_t **metadata) {
   plasma_request req = {.type = PLASMA_GET, .object_id = object_id};
   plasma_send(conn, &req);
   plasma_reply reply;
@@ -66,7 +82,8 @@ void plasma_get(int conn, plasma_id object_id, int64_t *size, uint8_t **data, in
   }
   assert(reply.type == PLASMA_OBJECT);
   *data =
-      ((uint8_t*) mmap(NULL, reply.map_size, PROT_READ, MAP_SHARED, fd, 0)) + reply.data_offset;
+      ((uint8_t *) mmap(NULL, reply.map_size, PROT_READ, MAP_SHARED, fd, 0)) +
+      reply.data_offset;
   if (*data == MAP_FAILED) {
     LOG_ERR("mmap failed");
     exit(-1);
