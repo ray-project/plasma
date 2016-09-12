@@ -84,7 +84,7 @@ typedef struct {
 typedef struct {
   plasma_id object_id;
   uint8_t *data;
-  int64_t size;
+  int64_t data_size;
   uint8_t *metadata;
   int64_t metadata_size;
   int writable;
