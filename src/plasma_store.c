@@ -162,7 +162,6 @@ void seal_object(int conn, plasma_request* req) {
   for (int i = 0; i < notify_entry->num_waiting; ++i) {
     send_fd(notify_entry->conn[i], entry->fd, (char*) &reply,
             sizeof(plasma_reply));
-    // close(notify_entry->conn[i]);
   }
   HASH_DELETE(handle, objects_notify, notify_entry);
   free(notify_entry);
@@ -201,6 +200,7 @@ void run_event_loop(int socket) {
       if (waiting->revents == 0)
         continue;
       if (waiting->fd == socket) {
+        /* Handle new incoming connections. */
         int new_socket = accept(socket, NULL, NULL);
         event_loop_attach(state.loop, 0, NULL, new_socket, POLLIN);
         LOG_INFO("adding new client");

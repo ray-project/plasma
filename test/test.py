@@ -99,7 +99,6 @@ class TestPlasmaManager(unittest.TestCase):
       object_id1 = random_object_id()
       # Create a new buffer and set the first and last entries.
       memory_buffer = self.client1.create(object_id1, 20000)
-      #memory_buffer[[0, -1]] = chr(1), chr(2)
       memory_buffer[0] = chr(1)
       memory_buffer[-1] = chr(2)
       # Seal the buffer.
