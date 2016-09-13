@@ -102,7 +102,6 @@ void create_object(int conn, plasma_request* req) {
   HASH_ADD(handle, open_objects, object_id, sizeof(plasma_id), entry);
   plasma_reply reply;
   memset(&reply, 0, sizeof(reply));
-  reply.type = PLASMA_OBJECT;
   reply.offset = offset;
   reply.map_size = map_size;
   reply.object_size = req->size;
@@ -116,7 +115,6 @@ void get_object(int conn, plasma_request* req) {
   if (entry) {
     plasma_reply reply;
     memset(&reply, 0, sizeof(plasma_reply));
-    reply.type = PLASMA_OBJECT;
     reply.offset = entry->offset;
     reply.map_size = entry->map_size;
     reply.object_size = entry->info.size;
@@ -156,7 +154,7 @@ void seal_object(int conn, plasma_request* req) {
   if (!notify_entry) {
     return;
   }
-  plasma_reply reply = {PLASMA_OBJECT, entry->offset, entry->map_size,
+  plasma_reply reply = {entry->offset, entry->map_size,
                         entry->info.size};
   for (int i = 0; i < notify_entry->num_waiting; ++i) {
     send_fd(notify_entry->conn[i], entry->fd, (char*) &reply,

@@ -63,13 +63,7 @@ typedef struct {
   int port;
 } plasma_request;
 
-enum plasma_reply_type {
-  /* the file descriptor represents an object */
-  PLASMA_OBJECT,
-};
-
 typedef struct {
-  int type;
   ptrdiff_t offset;
   int64_t map_size;
   int64_t object_size;
