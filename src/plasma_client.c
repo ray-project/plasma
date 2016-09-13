@@ -48,11 +48,6 @@ void plasma_get(int conn, plasma_id object_id, int64_t *size, void **data) {
   plasma_reply reply;
   /* The following loop is run at most twice. */
   int fd = recv_fd(conn, (char *) &reply, sizeof(plasma_reply));
-  if (reply.type == PLASMA_FUTURE) {
-    int new_fd = recv_fd(fd, (char *) &reply, sizeof(plasma_reply));
-    close(fd);
-    fd = new_fd;
-  }
   assert(reply.type == PLASMA_OBJECT);
   *data =
       mmap(NULL, reply.map_size, PROT_READ, MAP_SHARED, fd, 0) + reply.offset;
