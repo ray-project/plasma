@@ -25,12 +25,13 @@
   fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, \
           errno == 0 ? "None" : strerror(errno), ##__VA_ARGS__)
 
-#define PLASMA_CHECK(CONDITION, M, ...) \
-  do {                                                                      \
-    if (!(CONDITION)) {                                                     \
-      fprintf(stderr, "[FATAL] (%s:%d " #CONDITION ") \n" M, __FILE__, __LINE__); \
-      exit(-1);                                                             \
-    }                                                                       \
+#define PLASMA_CHECK(CONDITION, M, ...)                                \
+  do {                                                                 \
+    if (!(CONDITION)) {                                                \
+      fprintf(stderr, "[FATAL] (%s:%d " #CONDITION ") \n" M, __FILE__, \
+              __LINE__);                                               \
+      exit(-1);                                                        \
+    }                                                                  \
   } while (0)
 
 typedef struct {

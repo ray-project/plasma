@@ -122,13 +122,15 @@ void get_object(int conn, plasma_request* req) {
   } else {
     object_notify_entry* notify_entry;
     LOG_INFO("object not in hash table of sealed objects");
-    HASH_FIND(handle, objects_notify, &req->object_id, sizeof(plasma_id), notify_entry);
+    HASH_FIND(handle, objects_notify, &req->object_id, sizeof(plasma_id),
+              notify_entry);
     if (!notify_entry) {
       notify_entry = malloc(sizeof(object_notify_entry));
       memset(notify_entry, 0, sizeof(object_notify_entry));
       notify_entry->num_waiting = 0;
       memcpy(&notify_entry->object_id, &req->object_id, 20);
-      HASH_ADD(handle, objects_notify, object_id, sizeof(plasma_id), notify_entry);
+      HASH_ADD(handle, objects_notify, object_id, sizeof(plasma_id),
+               notify_entry);
     }
     PLASMA_CHECK(notify_entry->num_waiting < MAX_NUM_CLIENTS - 1,
                  "This exceeds the maximum number of clients.");
@@ -154,12 +156,13 @@ void seal_object(int conn, plasma_request* req) {
   if (!notify_entry) {
     return;
   }
-  plasma_reply reply = {entry->offset, entry->map_size,
-                        entry->info.size};
+  plasma_reply reply = {.offset = entry->offset,
+                        .map_size = entry->map_size,
+                        .object_size = entry->info.size};
   for (int i = 0; i < notify_entry->num_waiting; ++i) {
     send_fd(notify_entry->conn[i], entry->fd, (char*) &reply,
             sizeof(plasma_reply));
-    //close(notify_entry->conn[i]);
+    // close(notify_entry->conn[i]);
   }
   HASH_DELETE(handle, objects_notify, notify_entry);
   free(notify_entry);
