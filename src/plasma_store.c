@@ -27,7 +27,7 @@
 #include "plasma.h"
 #include "event_loop.h"
 
-#define MAX_NUM_CLIENTS 100000
+#define MAX_NUM_CLIENTS 100
 
 void* dlmalloc(size_t);
 
@@ -81,16 +81,21 @@ object_notify_entry* objects_notify = NULL;
 void create_object(int conn, plasma_request* req) {
   LOG_INFO("creating object"); /* TODO(pcm): add object_id here */
 
-  void* pointer = dlmalloc(req->size);
+  object_table_entry* entry;
+  HASH_FIND(handle, open_objects, &req->object_id, sizeof(plasma_id), entry);
+  PLASMA_CHECK(entry == NULL, "Cannot create object twice.");
+
+  uint8_t* pointer = dlmalloc(req->data_size + req->metadata_size);
   int fd;
   int64_t map_size;
   ptrdiff_t offset;
   get_malloc_mapinfo(pointer, &fd, &map_size, &offset);
   assert(fd != -1);
 
-  object_table_entry* entry = malloc(sizeof(object_table_entry));
+  entry = malloc(sizeof(object_table_entry));
   memcpy(&entry->object_id, &req->object_id, 20);
-  entry->info.size = req->size;
+  entry->info.data_size = req->data_size;
+  entry->info.metadata_size = req->metadata_size;
   /* TODO(pcm): set the other fields */
   entry->fd = fd;
   entry->map_size = map_size;
@@ -98,10 +103,11 @@ void create_object(int conn, plasma_request* req) {
   HASH_ADD(handle, open_objects, object_id, sizeof(plasma_id), entry);
   plasma_reply reply;
   memset(&reply, 0, sizeof(reply));
-  reply.type = PLASMA_OBJECT;
-  reply.offset = offset;
+  reply.data_offset = offset;
+  reply.metadata_offset = offset + req->data_size;
   reply.map_size = map_size;
-  reply.object_size = req->size;
+  reply.data_size = req->data_size;
+  reply.metadata_size = req->metadata_size;
   send_fd(conn, fd, (char*) &reply, sizeof(reply));
 }
 
@@ -110,21 +116,30 @@ void get_object(int conn, plasma_request* req) {
   object_table_entry* entry;
   HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(plasma_id), entry);
   if (entry) {
-    plasma_reply reply = {PLASMA_OBJECT, entry->offset, entry->map_size,
-                          entry->info.size};
+    plasma_reply reply;
+    memset(&reply, 0, sizeof(plasma_reply));
+    reply.data_offset = entry->offset;
+    reply.map_size = entry->map_size;
+    reply.data_size = entry->info.data_size;
+    reply.metadata_size = entry->info.metadata_size;
     send_fd(conn, entry->fd, (char*) &reply, sizeof(plasma_reply));
   } else {
+    object_notify_entry* notify_entry;
     LOG_INFO("object not in hash table of sealed objects");
-    int fd[2];
-    socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
-    object_notify_entry* notify_entry = malloc(sizeof(object_notify_entry));
-    memcpy(&notify_entry->object_id, &req->object_id, 20);
-    notify_entry->conn[notify_entry->num_waiting] = fd[0];
+    HASH_FIND(handle, objects_notify, &req->object_id, sizeof(plasma_id),
+              notify_entry);
+    if (!notify_entry) {
+      notify_entry = malloc(sizeof(object_notify_entry));
+      memset(notify_entry, 0, sizeof(object_notify_entry));
+      notify_entry->num_waiting = 0;
+      memcpy(&notify_entry->object_id, &req->object_id, 20);
+      HASH_ADD(handle, objects_notify, object_id, sizeof(plasma_id),
+               notify_entry);
+    }
+    PLASMA_CHECK(notify_entry->num_waiting < MAX_NUM_CLIENTS - 1,
+                 "This exceeds the maximum number of clients.");
+    notify_entry->conn[notify_entry->num_waiting] = conn;
     notify_entry->num_waiting += 1;
-    HASH_ADD(handle, objects_notify, object_id, sizeof(plasma_id),
-             notify_entry);
-    plasma_reply reply = {PLASMA_FUTURE, 0, 0, -1};
-    send_fd(conn, fd[1], (char*) &reply, sizeof(plasma_reply));
   }
 }
 
@@ -145,12 +160,13 @@ void seal_object(int conn, plasma_request* req) {
   if (!notify_entry) {
     return;
   }
-  plasma_reply reply = {PLASMA_OBJECT, entry->offset, entry->map_size,
-                        entry->info.size};
+  plasma_reply reply = {.data_offset = entry->offset,
+                        .map_size = entry->map_size,
+                        .data_size = entry->info.data_size};
   for (int i = 0; i < notify_entry->num_waiting; ++i) {
     send_fd(notify_entry->conn[i], entry->fd, (char*) &reply,
             sizeof(plasma_reply));
-    close(notify_entry->conn[i]);
+    // close(notify_entry->conn[i]);
   }
   HASH_DELETE(handle, objects_notify, notify_entry);
   free(notify_entry);
@@ -189,19 +205,9 @@ void run_event_loop(int socket) {
       if (waiting->revents == 0)
         continue;
       if (waiting->fd == socket) {
-        while (1) {
-          /* Handle new incoming connections. */
-          int new_socket = accept(socket, NULL, NULL);
-          if (new_socket < 0) {
-            if (errno != EWOULDBLOCK) {
-              LOG_ERR("accept failed");
-              exit(-1);
-            }
-            break;
-          }
-          event_loop_attach(state.loop, 0, NULL, new_socket, POLLIN);
-          LOG_INFO("adding new client");
-        }
+        int new_socket = accept(socket, NULL, NULL);
+        event_loop_attach(state.loop, 0, NULL, new_socket, POLLIN);
+        LOG_INFO("adding new client");
       } else {
         int r = read(waiting->fd, &req, sizeof(plasma_request));
         if (r == -1) {
@@ -227,12 +233,6 @@ void start_server(char* socket_name) {
   int on = 1;
   if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*) &on, sizeof(on)) < 0) {
     LOG_ERR("setsockopt failed");
-    close(fd);
-    exit(-1);
-  }
-  /* TODO(pcm): http://stackoverflow.com/q/1150635 */
-  if (ioctl(fd, FIONBIO, (char*) &on) < 0) {
-    LOG_ERR("ioctl failed");
     close(fd);
     exit(-1);
   }
