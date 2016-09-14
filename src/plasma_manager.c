@@ -87,7 +87,6 @@ void start_reading_data(int64_t index,
                        .data_size = req->data_size,
                        .metadata_size = req->metadata_size,
                        .writable = 1};
-  // TODO(rkn): Add the metadata below...
   plasma_create(store_conn, req->object_id, req->data_size, NULL,
                 req->metadata_size, &buf.data);
   data_connection conn = {.type = DATA_CONNECTION_READ,

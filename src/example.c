@@ -28,7 +28,6 @@ int main(int argc, char *argv[]) {
       break;
     case 'c':
       assert(conn != -1);
-      // TODO(rkn): Add the metadata below.
       plasma_create(conn, id, 100, NULL, 0, &data);
       break;
     case 'f':

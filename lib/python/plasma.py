@@ -82,8 +82,8 @@ class PlasmaClient(object):
   def get(self, object_id):
     """Create a buffer from the PlasmaStore based on object ID.
 
-    This method can only be called after the buffer has been sealed. The
-    retrieved buffer is immutable.
+    If the object has not been sealed yet, this call will block. The retrieved
+    buffer is immutable.
 
     Args:
       object_id (str): A string used to identify an object.
@@ -98,8 +98,8 @@ class PlasmaClient(object):
   def get_metadata(self, object_id):
     """Create a buffer from the PlasmaStore based on object ID.
 
-    This method can only be called after the buffer has been sealed. The
-    retrieved buffer is immutable.
+    If the object has not been sealed yet, this call will block until the object
+    has been sealed. The retrieved buffer is immutable.
 
     Args:
       object_id (str): A string used to identify an object.
@@ -120,7 +120,6 @@ class PlasmaClient(object):
     Args:
       object_id (str): A string used to identify an object.
     """
-
     self.client.plasma_seal(self.sock, make_plasma_id(object_id))
 
   def transfer(self, addr, port, object_id):
