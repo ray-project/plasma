@@ -113,7 +113,9 @@ void get_malloc_mapinfo(void *addr,
     if (addr >= record->pointer && addr < record->pointer + record->size) {
       *fd = record->fd;
       *map_size = record->size;
-      *offset = addr - record->pointer;
+      /* We add sizeof(size_t) here so that the returned pointer is deliberately
+       # not page-aligned. See the documentation for fake_mmap. */
+      *offset = addr - record->pointer + sizeof(size_t);
       return;
     }
   }
