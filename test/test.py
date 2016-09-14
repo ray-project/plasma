@@ -21,7 +21,7 @@ def generate_metadata(length):
     metadata[-1] = chr(random.randint(0, 255))
     for _ in range(100):
       metadata[random.randint(0, length - 1)] = chr(random.randint(0, 255))
-  return "".join(metadata)
+  return buffer("".join(metadata))
 
 def write_to_data_buffer(buff, length):
   if length > 0:
@@ -149,11 +149,11 @@ class TestPlasmaManager(unittest.TestCase):
       # Compare the two buffers.
       self.assertEqual(memory_buffer1[:], self.client2.get(object_id1)[:])
       self.assertEqual(self.client1.get(object_id1)[:], self.client2.get(object_id1)[:])
-      self.assertEqual(metadata1, self.client2.get_metadata(object_id1)[:])
+      self.assertEqual(metadata1[:], self.client2.get_metadata(object_id1)[:])
       self.assertEqual(self.client1.get_metadata(object_id1)[:], self.client2.get_metadata(object_id1)[:])
       # Transfer the buffer again.
       self.client1.transfer("127.0.0.1", self.port2, object_id1)
-      self.assertEqual(metadata1, self.client2.get_metadata(object_id1)[:])
+      self.assertEqual(metadata1[:], self.client2.get_metadata(object_id1)[:])
       # Compare the two buffers.
       self.assertEqual(self.client1.get(object_id1)[:], self.client2.get(object_id1)[:])
 
@@ -164,7 +164,7 @@ class TestPlasmaManager(unittest.TestCase):
       # Compare the two buffers.
       self.assertEqual(memory_buffer2[:], self.client2.get(object_id2)[:])
       self.assertEqual(self.client1.get(object_id2)[:], self.client2.get(object_id2)[:])
-      self.assertEqual(metadata2, self.client2.get_metadata(object_id2)[:])
+      self.assertEqual(metadata2[:], self.client2.get_metadata(object_id2)[:])
       self.assertEqual(self.client1.get_metadata(object_id2)[:], self.client2.get_metadata(object_id2)[:])
 
   def test_illegal_functionality(self):

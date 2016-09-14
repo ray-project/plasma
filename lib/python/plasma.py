@@ -68,14 +68,13 @@ class PlasmaClient(object):
     Args:
       object_id (str): A string used to identify an object.
       size (int): The size in bytes of the created buffer.
-      metadata (str): An optional string encoding whatever metadata the user
+      metadata (buffer): An optional buffer encoding whatever metadata the user
         wishes to encode.
     """
     # This is used to hold the address of the buffer.
     data = ctypes.c_void_p()
     # Turn the metadata into the right type.
-    metadata = "" if metadata is None else metadata
-    # This does an unnecessary copy.
+    metadata = buffer("") if metadata is None else metadata
     metadata = (ctypes.c_ubyte * len(metadata)).from_buffer_copy(metadata)
     self.client.plasma_create(self.sock, make_plasma_id(object_id), size, metadata, len(metadata), ctypes.byref(data))
     return self.buffer_from_read_write_memory(data, size)
