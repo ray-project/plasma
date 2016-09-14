@@ -36,6 +36,7 @@ struct mmap_record {
   UT_hash_handle hh_pointer;
 };
 
+// TODO(rshin): Don't have two hash tables.
 struct mmap_record *records_by_fd = NULL;
 struct mmap_record *records_by_pointer = NULL;
 
@@ -68,13 +69,14 @@ void *fake_mmap(size_t size) {
   // Add sizeof(size_t) so that the returned pointer is deliberately not
   // page-aligned. This ensures that the segments of memory returned by
   // fake_mmap are never contiguous.
-  int fd = create_buffer(size + sizeof(size_t));
-  void *pointer = mmap(NULL, size + sizeof(size_t), PROT_READ | PROT_WRITE,
+  size += sizeof(size_t);
+
+  int fd = create_buffer(size);
+  void *pointer = mmap(NULL, size, PROT_READ | PROT_WRITE,
                        MAP_SHARED, fd, 0);
   if (pointer == MAP_FAILED) {
     return pointer;
   }
-  pointer += sizeof(size_t);
 
   struct mmap_record *record = malloc(sizeof(struct mmap_record));
   record->fd = fd;
@@ -83,16 +85,19 @@ void *fake_mmap(size_t size) {
   HASH_ADD(hh_fd, records_by_fd, fd, sizeof(fd), record);
   HASH_ADD(hh_pointer, records_by_pointer, pointer, sizeof(pointer), record);
 
+  // We lie to dlmalloc about where mapped memory actually lives.
+  pointer += sizeof(size_t);
   LOG_DEBUG("%p = fake_mmap(%lu)", pointer, size);
   return pointer;
 }
 
 int fake_munmap(void *addr, size_t size) {
   LOG_DEBUG("fake_munmap(%p, %lu)", addr, size);
+  addr -= sizeof(size_t);
+  size += sizeof(size_t);
 
   struct mmap_record *record;
 
-  addr -= sizeof(size_t);
   HASH_FIND(hh_pointer, records_by_pointer, &addr, sizeof(addr), record);
   assert(record != NULL);
   close(record->fd);
@@ -100,7 +105,7 @@ int fake_munmap(void *addr, size_t size) {
   HASH_DELETE(hh_fd, records_by_fd, record);
   HASH_DELETE(hh_pointer, records_by_pointer, record);
 
-  return munmap(addr, size + sizeof(size_t));
+  return munmap(addr, size);
 }
 
 void get_malloc_mapinfo(void *addr,
@@ -113,9 +118,7 @@ void get_malloc_mapinfo(void *addr,
     if (addr >= record->pointer && addr < record->pointer + record->size) {
       *fd = record->fd;
       *map_size = record->size;
-      /* We add sizeof(size_t) here so that the returned pointer is deliberately
-       # not page-aligned. See the documentation for fake_mmap. */
-      *offset = addr - record->pointer + sizeof(size_t);
+      *offset = addr - record->pointer;
       return;
     }
   }
