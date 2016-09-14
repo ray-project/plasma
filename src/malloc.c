@@ -36,7 +36,7 @@ struct mmap_record {
   UT_hash_handle hh_pointer;
 };
 
-// TODO(rshin): Don't have two hash tables.
+/* TODO(rshin): Don't have two hash tables. */
 struct mmap_record *records_by_fd = NULL;
 struct mmap_record *records_by_pointer = NULL;
 
@@ -66,14 +66,13 @@ int create_buffer(int64_t size) {
 }
 
 void *fake_mmap(size_t size) {
-  // Add sizeof(size_t) so that the returned pointer is deliberately not
-  // page-aligned. This ensures that the segments of memory returned by
-  // fake_mmap are never contiguous.
+  /* Add sizeof(size_t) so that the returned pointer is deliberately not
+   * page-aligned. This ensures that the segments of memory returned by
+   * fake_mmap are never contiguous. */
   size += sizeof(size_t);
 
   int fd = create_buffer(size);
-  void *pointer = mmap(NULL, size, PROT_READ | PROT_WRITE,
-                       MAP_SHARED, fd, 0);
+  void *pointer = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (pointer == MAP_FAILED) {
     return pointer;
   }
@@ -85,7 +84,7 @@ void *fake_mmap(size_t size) {
   HASH_ADD(hh_fd, records_by_fd, fd, sizeof(fd), record);
   HASH_ADD(hh_pointer, records_by_pointer, pointer, sizeof(pointer), record);
 
-  // We lie to dlmalloc about where mapped memory actually lives.
+  /* We lie to dlmalloc about where mapped memory actually lives. */
   pointer += sizeof(size_t);
   LOG_DEBUG("%p = fake_mmap(%lu)", pointer, size);
   return pointer;
@@ -113,7 +112,7 @@ void get_malloc_mapinfo(void *addr,
                         int64_t *map_size,
                         ptrdiff_t *offset) {
   struct mmap_record *record;
-  // TODO(rshin): Implement a more efficient search through records_by_fd.
+  /* TODO(rshin): Implement a more efficient search through records_by_fd. */
   for (record = records_by_fd; record != NULL; record = record->hh_fd.next) {
     if (addr >= record->pointer && addr < record->pointer + record->size) {
       *fd = record->fd;
