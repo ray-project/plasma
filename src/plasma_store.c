@@ -25,6 +25,7 @@
 #include "fling.h"
 #include "malloc.h"
 #include "plasma.h"
+#include "plasma_store.h"
 #include "event_loop.h"
 
 #define MAX_NUM_CLIENTS 100
