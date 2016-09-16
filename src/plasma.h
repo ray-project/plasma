@@ -60,13 +60,17 @@ enum plasma_request_type {
 };
 
 typedef struct {
+  /* Type of the request. */
   int type;
+  /* Object ID refered to by this request. */
   plasma_id object_id;
   /* The size of the data. */
   int64_t data_size;
   /* The size of the metadata. */
   int64_t metadata_size;
+  /* Bytes of manager IPv4 address. */
   uint8_t addr[4];
+  /* Port of the manager. */
   int port;
 } plasma_request;
 

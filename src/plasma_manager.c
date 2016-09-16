@@ -25,11 +25,25 @@
 #include "plasma_client.h"
 #include "plasma_manager.h"
 
+/* Connection to another plasma manager */
+typedef struct {
+  /* Maximum size of an IP address is 45 bytes. */
+  char addr[46];
+  /* List of objects to be sent. */
+  UT_array *send_queue;
+  /* Index into the event loop. */
+  int64_t event_loop_index;
+  /* Handle for hash table. */
+  UT_hash_handle hh;
+} manager_connections_entry;
+
 typedef struct {
   /* Connection to local plasma store. */
   plasma_store_conn *conn;
   /* Event loop. */
   event_loop *loop;
+  /* Already established connections to other plasma managers. */
+  manager_connections_entry *connections;
 } plasma_manager_state;
 
 /* Initialize the plasma manager. This function initializes the event loop
