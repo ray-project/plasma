@@ -4,6 +4,13 @@
 #include <poll.h>
 #include "utarray.h"
 
+void start_write_object(plasma_manager_state *s, object_id object_id);
+void start_read_object(plasma_manager_state *s, object_id object_id);
+void read_object_chunk(plasma_manager_state *s, object_id object_id);
+void write_object_chunk(plasma_manager_state *s, object_id object_id);
+
+void fetch_object(plasma_manager_state *s, object_id object_id, manager_addr addr);
+
 /* The buffer size in bytes. Data will get transfered in multiples of this */
 #define BUFSIZE 4096
 

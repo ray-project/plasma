@@ -15,6 +15,11 @@ void plasma_create(plasma_store_conn *conn,
                    int64_t metadata_size,
                    uint8_t **data);
 
+void plasma_resize(plasma_store_conn *conn,
+                   plasma_id object_id,
+                   int64_t new_size,
+                   uint8_t **data);
+
 void plasma_get(plasma_store_conn *conn,
                 plasma_id object_id,
                 int64_t *size,
@@ -23,5 +28,7 @@ void plasma_get(plasma_store_conn *conn,
                 uint8_t **metadata);
 
 void plasma_seal(plasma_store_conn *conn, plasma_id object_id);
+
+void plasma_fetch(plasma_store_conn *conn, plasma_id object_id);
 
 #endif
