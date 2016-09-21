@@ -29,6 +29,11 @@ void plasma_get(plasma_store_conn *conn,
 
 void plasma_seal(plasma_store_conn *conn, plasma_id object_id);
 
+void plasma_delete(plasma_store_conn *conn, plasma_id object_id);
+
+void plasma_unmap(plasma_id object_id);
+
 void plasma_fetch(plasma_store_conn *conn, plasma_id object_id);
+
 
 #endif
