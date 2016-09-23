@@ -32,36 +32,17 @@
 void* dlmalloc(size_t);
 
 typedef struct {
-  /* Event loop for the plasma store. */
-  event_loop* loop;
-} plasma_store_state;
-
-void init_state(plasma_store_state* s) {
-  s->loop = malloc(sizeof(event_loop));
-  event_loop_init(s->loop);
-}
-
-typedef struct {
   /* Object id of this object. */
   plasma_id object_id;
   /* Object info like size, creation time and owner. */
   plasma_object_info info;
   /* Memory mapped file containing the object. */
-  int fd;
-  /* Size of the underlying map. */
-  int64_t map_size;
+  mmap_handle handle;
   /* Offset from the base of the mmap. */
   ptrdiff_t offset;
   /* Handle for the uthash table. */
   UT_hash_handle handle;
 } object_table_entry;
-
-/* Objects that are still being written by their owner process. */
-object_table_entry* open_objects = NULL;
-
-/* Objects that have already been sealed by their owner process and
- * can now be shared with other processes. */
-object_table_entry* sealed_objects = NULL;
 
 typedef struct {
   /* Object id of this object. */
@@ -74,8 +55,25 @@ typedef struct {
   UT_hash_handle handle;
 } object_notify_entry;
 
-/* Objects that processes are waiting for. */
-object_notify_entry* objects_notify = NULL;
+typedef struct {
+  /* Event loop for the plasma store. */
+  event_loop* loop;
+  /* Objects that are still being written by their owner process. */
+  object_table_entry* open_objects;
+  /* Objects that have already been sealed by their owner process and
+   * can now be shared with other processes. */
+  object_table_entry* sealed_objects;
+  /* Objects that processes are waiting for. */
+  object_notify_entry* objects_notify;
+} plasma_store_state;
+
+void init_state(plasma_store_state* s) {
+  s->loop = malloc(sizeof(event_loop));
+  event_loop_init(s->loop);
+  s->open_objects = NULL;
+  s->sealed_objects = NULL;
+  s->objects_notify = NULL;
+}
 
 /* Create a new object buffer in the hash table. */
 void create_object(int conn, plasma_request* req) {

@@ -75,14 +75,14 @@ typedef struct {
   ptrdiff_t data_offset;
   /* The offset in the memory mapped file of the metadata. */
   ptrdiff_t metadata_offset;
-  /* The size of the memory mapped file. */
-  int64_t map_size;
   /* The size of the data. */
   int64_t data_size;
   /* The size of the metadata. */
   int64_t metadata_size;
   /* Numerical value of the fd of the memory mapped file in the store. */
   int store_fd_val;
+  /* The size of the memory mapped file. */
+  int64_t map_size;
 } plasma_reply;
 
 typedef struct {
