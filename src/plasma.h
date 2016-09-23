@@ -86,7 +86,7 @@ typedef struct {
   /* The size of the metadata. */
   int64_t metadata_size;
   /* 1 if the object is present and 0 otherwise. Used for plasma_contains. */
-  int64_t has_object;
+  int has_object;
   /* Numerical value of the fd of the memory mapped file in the store. */
   int store_fd_val;
 } plasma_reply;

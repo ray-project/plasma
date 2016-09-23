@@ -119,7 +119,7 @@ class PlasmaClient(object):
     Args:
       object_id (str): A string used to identify an object.
     """
-    has_object = ctypes.c_int64()
+    has_object = ctypes.c_int()
     self.client.plasma_contains(self.store_conn, make_plasma_id(object_id), ctypes.byref(has_object))
     has_object = has_object.value
     if has_object == 1:
@@ -127,7 +127,6 @@ class PlasmaClient(object):
     elif has_object == 0:
       return False
     else:
-      print "has_object is {}.".format(has_object)
       raise Exception("This code should be unreachable.")
 
   def seal(self, object_id):

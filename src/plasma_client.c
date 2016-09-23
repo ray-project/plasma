@@ -108,13 +108,13 @@ void plasma_get(plasma_store_conn *conn,
 /* This method is used to query whether the plasma store contains an object. */
 void plasma_contains(plasma_store_conn *conn,
                      plasma_id object_id,
-                     int64_t *has_object) {
+                     int *has_object) {
   plasma_request req = {.type = PLASMA_CONTAINS, .object_id = object_id};
   plasma_send_request(conn->conn, &req);
   plasma_reply reply;
   int r = read(conn->conn, &reply, sizeof(plasma_reply));
-  PLASMA_CHECK(r != -1,  "read error");
-  PLASMA_CHECK(r != 0,  "connection disconnected");
+  PLASMA_CHECK(r != -1, "read error");
+  PLASMA_CHECK(r != 0, "connection disconnected");
   *has_object = reply.has_object;
 }
 

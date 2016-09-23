@@ -27,7 +27,7 @@ void plasma_get(plasma_store_conn *conn,
  * to indicate whether the object is currently being written. */
 void plasma_contains(plasma_store_conn *conn,
                      plasma_id object_id,
-                     int64_t *has_object);
+                     int *has_object);
 
 void plasma_seal(plasma_store_conn *conn, plasma_id object_id);
 

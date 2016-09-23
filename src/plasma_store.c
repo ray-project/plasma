@@ -30,13 +30,14 @@
 #define MAX_NUM_CLIENTS 100
 
 void* dlmalloc(size_t);
+void dlfree(void*);
 
 typedef struct {
   /* Event loop for the plasma store. */
   event_loop* loop;
 } plasma_store_state;
 
-void plasma_send_reply(int fd, plasma_reply *reply) {
+void plasma_send_reply(int fd, plasma_reply* reply) {
   int reply_count = sizeof(plasma_reply);
   if (write(fd, reply, reply_count) != reply_count) {
     LOG_ERR("write error, fd = %d", fd);
@@ -62,6 +63,8 @@ typedef struct {
   ptrdiff_t offset;
   /* Handle for the uthash table. */
   UT_hash_handle handle;
+  /* Pointer to the object data. Needed to free the object. */
+  uint8_t* pointer;
 } object_table_entry;
 
 /* Objects that are still being written by their owner process. */
@@ -104,6 +107,7 @@ void create_object(int conn, plasma_request* req) {
   memcpy(&entry->object_id, &req->object_id, 20);
   entry->info.data_size = req->data_size;
   entry->info.metadata_size = req->metadata_size;
+  entry->pointer = pointer;
   /* TODO(pcm): set the other fields */
   entry->fd = fd;
   entry->map_size = map_size;
@@ -203,7 +207,9 @@ void delete_object(int conn, plasma_request* req) {
    * error. Maybe we should also support deleting objects that have been created
    * but not sealed. */
   PLASMA_CHECK(entry != NULL, "To delete an object it must have been sealed.");
+  uint8_t* pointer = entry->pointer;
   HASH_DELETE(handle, sealed_objects, entry);
+  dlfree(pointer);
 }
 
 void process_event(int conn, plasma_request* req) {
