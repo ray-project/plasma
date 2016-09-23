@@ -36,6 +36,14 @@ typedef struct {
   event_loop* loop;
 } plasma_store_state;
 
+void plasma_send_reply(int fd, plasma_reply *reply) {
+  int reply_count = sizeof(plasma_reply);
+  if (write(fd, reply, reply_count) != reply_count) {
+    LOG_ERR("write error, fd = %d", fd);
+    exit(-1);
+  }
+}
+
 void init_state(plasma_store_state* s) {
   s->loop = malloc(sizeof(event_loop));
   event_loop_init(s->loop);
@@ -145,6 +153,16 @@ void get_object(int conn, plasma_request* req) {
   }
 }
 
+/* Check if an object is present. */
+void check_if_object_present(int conn, plasma_request* req) {
+  object_table_entry* entry;
+  HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(plasma_id), entry);
+  plasma_reply reply;
+  memset(&reply, 0, sizeof(plasma_reply));
+  reply.has_object = entry ? 1 : 0;
+  plasma_send_reply(conn, &reply);
+}
+
 /* Seal an object that has been created in the hash table. */
 void seal_object(int conn, plasma_request* req) {
   LOG_INFO("sealing object");  // TODO(pcm): add object_id here
@@ -176,6 +194,18 @@ void seal_object(int conn, plasma_request* req) {
   free(notify_entry);
 }
 
+/* Delete an object that has been created in the hash table. */
+void delete_object(int conn, plasma_request* req) {
+  LOG_INFO("deleting object");  // TODO(rkn): add object_id here
+  object_table_entry* entry;
+  HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(plasma_id), entry);
+  /* TODO(rkn): This should probably not fail, but should instead throw an
+   * error. Maybe we should also support deleting objects that have been created
+   * but not sealed. */
+  PLASMA_CHECK(entry != NULL, "To delete an object it must have been sealed.");
+  HASH_DELETE(handle, sealed_objects, entry);
+}
+
 void process_event(int conn, plasma_request* req) {
   switch (req->type) {
   case PLASMA_CREATE:
@@ -184,8 +214,14 @@ void process_event(int conn, plasma_request* req) {
   case PLASMA_GET:
     get_object(conn, req);
     break;
+  case PLASMA_CONTAINS:
+    check_if_object_present(conn, req);
+    break;
   case PLASMA_SEAL:
     seal_object(conn, req);
+    break;
+  case PLASMA_DELETE:
+    delete_object(conn, req);
     break;
   default:
     LOG_ERR("invalid request %d", req->type);
