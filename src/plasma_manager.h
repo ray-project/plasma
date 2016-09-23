@@ -4,11 +4,23 @@
 #include <poll.h>
 #include "utarray.h"
 
-void start_write_object(plasma_manager_state *s, int64_t conn_index, object_id object_id);
-void start_read_object(plasma_manager_state *s, int64_t conn_index, object_id object_id);
-void read_object_chunk(plasma_manager_state *s, int64_t conn_index, object_id object_id);
-void write_object_chunk(plasma_manager_state *s, int64_t conn_index, object_id object_id);
+/* Start writing the object with id "object_id" to the plasma manager with
+ * with connection index "conn_index". */
+void start_write_object(plasma_manager_state *s, object_id object_id, int64_t conn_index);
 
+/* Start reading the object with id "object_id" from the plasma manager with
+ * connection index "conn_index". */
+void start_read_object(plasma_manager_state *s, object_id object_id, int64_t conn_index);
+
+/* Read the next chunk of the object with id "object_id" from the plasma manager
+ * that is connected to the connection with index "conn_index". */
+void read_object_chunk(plasma_manager_state *s, object_id object_id, int64_t conn_index);
+
+/* Write the next chunk of the object with id "object_id" to the plasma manager
+ * that is connected to the connection with index "conn_index". */
+void write_object_chunk(plasma_manager_state *s, object_id object_id, int64_t conn_index);
+
+/* Fetch object with id object_id from plasma manager at address addr. */
 void fetch_object(plasma_manager_state *s, object_id object_id, manager_addr addr);
 
 /* The buffer size in bytes. Data will get transfered in multiples of this */
