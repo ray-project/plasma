@@ -18,6 +18,7 @@ int fake_munmap(void *, size_t);
 #define DIRECT_MUNMAP(a, s) fake_munmap(a, s)
 #define USE_DL_PREFIX
 #define HAVE_MORECORE 0
+#define DEFAULT_GRANULARITY ((size_t) 1048576U)
 
 #include "thirdparty/dlmalloc.c"
 
@@ -27,6 +28,7 @@ int fake_munmap(void *, size_t);
 #undef DIRECT_MUNMAP
 #undef USE_DL_PREFIX
 #undef HAVE_MORECORE
+#undef DEFAULT_GRANULARITY
 
 struct mmap_record {
   int fd;
