@@ -4,6 +4,10 @@ BUILD = build
 
 all: $(BUILD)/plasma_store $(BUILD)/plasma_manager $(BUILD)/plasma_client.so $(BUILD)/example
 
+debug: FORCE
+debug: CFLAGS += -DDEBUG=1
+debug: all
+
 clean:
 	cd common; make clean
 	rm -r $(BUILD)/*
