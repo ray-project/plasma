@@ -18,7 +18,7 @@ int fake_munmap(void *, size_t);
 #define DIRECT_MUNMAP(a, s) fake_munmap(a, s)
 #define USE_DL_PREFIX
 #define HAVE_MORECORE 0
-#define DEFAULT_GRANULARITY ((size_t) 1048576U)
+#define DEFAULT_GRANULARITY ((size_t) 1U << 25)
 
 #include "thirdparty/dlmalloc.c"
 
@@ -100,7 +100,11 @@ int fake_munmap(void *addr, size_t size) {
   struct mmap_record *record;
 
   HASH_FIND(hh_pointer, records_by_pointer, &addr, sizeof(addr), record);
-  assert(record != NULL);
+  if (record == NULL || record->size != size) {
+    /* Reject requests to munmap that don't directly match previous
+     * calls to mmap, to prevent dlmalloc from trimming. */
+    return -1;
+  }
   close(record->fd);
 
   HASH_DELETE(hh_fd, records_by_fd, record);
