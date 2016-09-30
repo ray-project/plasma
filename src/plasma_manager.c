@@ -48,7 +48,7 @@ typedef struct {
   int64_t cursor;
 } data_connection;
 
-void write_data(event_loop *loop, int data_sock, void *context, int events) {
+void transfer_data(event_loop *loop, int data_sock, void *context, int events) {
   LOG_DEBUG("Writing data");
   ssize_t r, s;
   data_connection *conn = (data_connection *) context;
@@ -124,7 +124,7 @@ void initiate_transfer(event_loop *loop,
   transfer_conn->store_conn = conn->store_conn;
   transfer_conn->buf = buf;
   transfer_conn->cursor = 0;
-  event_loop_add_file(loop, fd, EVENT_LOOP_WRITE, write_data, transfer_conn);
+  event_loop_add_file(loop, fd, EVENT_LOOP_WRITE, transfer_data, transfer_conn);
   plasma_request manager_req = {.object_id = req->object_id,
                                 .data_size = buf.data_size,
                                 .metadata_size = buf.metadata_size};
@@ -174,7 +174,7 @@ void process_message(event_loop *loop,
     start_reading_data(loop, client_sock, req, conn);
     break;
   case DISCONNECT_CLIENT: {
-    LOG_DEBUG("Disconnecting client on fd %d", client_sock);
+    LOG_INFO("Disconnecting client on fd %d", client_sock);
     event_loop_remove_file(loop, client_sock);
     close(client_sock);
     free(conn);
