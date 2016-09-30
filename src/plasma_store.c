@@ -44,7 +44,7 @@ void plasma_send_reply(int fd, plasma_reply* reply) {
 
 typedef struct {
   /* Object id of this object. */
-  plasma_id object_id;
+  object_id object_id;
   /* Object info like size, creation time and owner. */
   plasma_object_info info;
   /* Memory mapped file containing the object. */
@@ -68,7 +68,7 @@ object_table_entry* sealed_objects = NULL;
 
 typedef struct {
   /* Object id of this object. */
-  plasma_id object_id;
+  object_id object_id;
   /* Number of processes waiting for the object. */
   int num_waiting;
   /* Socket connections to waiting clients. */
@@ -85,7 +85,7 @@ void create_object(int conn, plasma_request* req) {
   LOG_INFO("creating object"); /* TODO(pcm): add object_id here */
 
   object_table_entry* entry;
-  HASH_FIND(handle, open_objects, &req->object_id, sizeof(plasma_id), entry);
+  HASH_FIND(handle, open_objects, &req->object_id, sizeof(object_id), entry);
   CHECKM(entry == NULL, "Cannot create object twice.");
 
   uint8_t* pointer = dlmalloc(req->data_size + req->metadata_size);
@@ -104,7 +104,7 @@ void create_object(int conn, plasma_request* req) {
   entry->fd = fd;
   entry->map_size = map_size;
   entry->offset = offset;
-  HASH_ADD(handle, open_objects, object_id, sizeof(plasma_id), entry);
+  HASH_ADD(handle, open_objects, object_id, sizeof(object_id), entry);
   plasma_reply reply;
   memset(&reply, 0, sizeof(reply));
   reply.data_offset = offset;
@@ -119,7 +119,7 @@ void create_object(int conn, plasma_request* req) {
 /* Get an object from the hash table. */
 void get_object(int conn, plasma_request* req) {
   object_table_entry* entry;
-  HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(plasma_id), entry);
+  HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(object_id), entry);
   if (entry) {
     plasma_reply reply;
     memset(&reply, 0, sizeof(plasma_reply));
@@ -132,14 +132,14 @@ void get_object(int conn, plasma_request* req) {
   } else {
     object_notify_entry* notify_entry;
     LOG_INFO("object not in hash table of sealed objects");
-    HASH_FIND(handle, objects_notify, &req->object_id, sizeof(plasma_id),
+    HASH_FIND(handle, objects_notify, &req->object_id, sizeof(object_id),
               notify_entry);
     if (!notify_entry) {
       notify_entry = malloc(sizeof(object_notify_entry));
       memset(notify_entry, 0, sizeof(object_notify_entry));
       notify_entry->num_waiting = 0;
       memcpy(&notify_entry->object_id, &req->object_id, 20);
-      HASH_ADD(handle, objects_notify, object_id, sizeof(plasma_id),
+      HASH_ADD(handle, objects_notify, object_id, sizeof(object_id),
                notify_entry);
     }
     CHECKM(notify_entry->num_waiting < MAX_NUM_CLIENTS - 1,
@@ -152,7 +152,7 @@ void get_object(int conn, plasma_request* req) {
 /* Check if an object is present. */
 void check_if_object_present(int conn, plasma_request* req) {
   object_table_entry* entry;
-  HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(plasma_id), entry);
+  HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(object_id), entry);
   plasma_reply reply;
   memset(&reply, 0, sizeof(plasma_reply));
   reply.has_object = entry ? 1 : 0;
@@ -163,16 +163,16 @@ void check_if_object_present(int conn, plasma_request* req) {
 void seal_object(int conn, plasma_request* req) {
   LOG_INFO("sealing object");  // TODO(pcm): add object_id here
   object_table_entry* entry;
-  HASH_FIND(handle, open_objects, &req->object_id, sizeof(plasma_id), entry);
+  HASH_FIND(handle, open_objects, &req->object_id, sizeof(object_id), entry);
   if (!entry) {
     return; /* TODO(pcm): return error */
   }
   int fd = entry->fd;
   HASH_DELETE(handle, open_objects, entry);
-  HASH_ADD(handle, sealed_objects, object_id, sizeof(plasma_id), entry);
+  HASH_ADD(handle, sealed_objects, object_id, sizeof(object_id), entry);
   /* Inform processes that the object is ready now. */
   object_notify_entry* notify_entry;
-  HASH_FIND(handle, objects_notify, &req->object_id, sizeof(plasma_id),
+  HASH_FIND(handle, objects_notify, &req->object_id, sizeof(object_id),
             notify_entry);
   if (!notify_entry) {
     return;
@@ -194,7 +194,7 @@ void seal_object(int conn, plasma_request* req) {
 void delete_object(int conn, plasma_request* req) {
   LOG_INFO("deleting object");  // TODO(rkn): add object_id here
   object_table_entry* entry;
-  HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(plasma_id), entry);
+  HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(object_id), entry);
   /* TODO(rkn): This should probably not fail, but should instead throw an
    * error. Maybe we should also support deleting objects that have been created
    * but not sealed. */

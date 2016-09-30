@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
   int64_t size;
   uint8_t *data;
   int c;
-  plasma_id id = {{255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  object_id id = {{255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
                    255, 255, 255, 255, 255, 255, 255, 255, 255, 255}};
   while ((c = getopt(argc, argv, "s:cfg")) != -1) {
     switch (c) {
@@ -43,5 +43,5 @@ int main(int argc, char *argv[]) {
     }
   }
   assert(conn != NULL);
-  close(conn->conn);
+  plasma_store_disconnect(conn);
 }

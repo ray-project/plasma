@@ -27,8 +27,20 @@
 #include "plasma_client.h"
 #include "plasma_manager.h"
 
+/* Buffer for reading and writing data between plasma managers. */
 typedef struct {
-  /* Connection to the local plasma store for reading or writing data. */
+  object_id object_id;
+  uint8_t *data;
+  int64_t data_size;
+  uint8_t *metadata;
+  int64_t metadata_size;
+  int writable;
+} plasma_buffer;
+
+/* Context for a client connection to another plasma manager. */
+typedef struct {
+  /* Connection to the local plasma store for reading or writing data. This is
+   * shared between all clients. */
   plasma_store_conn *store_conn;
   /* Buffer this connection is reading from or writing to. */
   plasma_buffer buf;
@@ -57,6 +69,7 @@ void write_data(event_loop *loop, int data_sock, void *context, int events) {
   if (r == 0) {
     LOG_DEBUG("writing on channel %d finished", data_sock);
     event_loop_remove_file(loop, data_sock);
+    free(conn);
     close(data_sock);
   }
 }
@@ -77,6 +90,7 @@ void read_data(event_loop *loop, int data_sock, void *context, int events) {
     LOG_DEBUG("reading on channel %d finished", data_sock);
     plasma_seal(conn->store_conn, conn->buf.object_id);
     event_loop_remove_file(loop, data_sock);
+    free(conn);
     close(data_sock);
   }
   return;
@@ -159,6 +173,12 @@ void process_message(event_loop *loop,
     LOG_INFO("starting to stream data");
     start_reading_data(loop, client_sock, req, conn);
     break;
+  case DISCONNECT_CLIENT: {
+    LOG_INFO("Disconnecting client on fd %d", client_sock);
+    event_loop_remove_file(loop, client_sock);
+    close(client_sock);
+    free(conn);
+  } break;
   default:
     LOG_ERR("invalid request %" PRId64, type);
     exit(-1);

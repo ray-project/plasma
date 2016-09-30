@@ -18,6 +18,25 @@
 #include "plasma_client.h"
 #include "fling.h"
 
+struct client_mmap_table_entry_impl {
+  /** Key that uniquely identifies the  memory mapped file. In practice, we
+   *  take the numerical value of the file descriptor in the object store. */
+  int key;
+  /** The result of mmap for this file descriptor. */
+  uint8_t *pointer;
+  /** Handle for the uthash table. */
+  UT_hash_handle hh;
+};
+
+/** Information about a connection between a Plasma Client and Plasma Store.
+ *  This is used to avoid mapping the same files into memory multiple times. */
+struct plasma_store_conn_impl {
+  /** File descriptor of the Unix domain socket that connects to the store. */
+  int conn;
+  /** Table of dlmalloc buffer files that have been memory mapped so far. */
+  client_mmap_table_entry *mmap_table;
+};
+
 void plasma_send_request(int fd, int type, plasma_request *req) {
   int req_count = sizeof(plasma_request);
   write_message(fd, type, req_count, (uint8_t *) req);
@@ -52,7 +71,7 @@ uint8_t *lookup_or_mmap(plasma_store_conn *conn,
 }
 
 void plasma_create(plasma_store_conn *conn,
-                   plasma_id object_id,
+                   object_id object_id,
                    int64_t data_size,
                    uint8_t *metadata,
                    int64_t metadata_size,
@@ -84,7 +103,7 @@ void plasma_create(plasma_store_conn *conn,
 
 /* This method is used to get both the data and the metadata. */
 void plasma_get(plasma_store_conn *conn,
-                plasma_id object_id,
+                object_id object_id,
                 int64_t *size,
                 uint8_t **data,
                 int64_t *metadata_size,
@@ -105,7 +124,7 @@ void plasma_get(plasma_store_conn *conn,
 
 /* This method is used to query whether the plasma store contains an object. */
 void plasma_contains(plasma_store_conn *conn,
-                     plasma_id object_id,
+                     object_id object_id,
                      int *has_object) {
   plasma_request req = {.object_id = object_id};
   plasma_send_request(conn->conn, PLASMA_CONTAINS, &req);
@@ -116,12 +135,12 @@ void plasma_contains(plasma_store_conn *conn,
   *has_object = reply.has_object;
 }
 
-void plasma_seal(plasma_store_conn *conn, plasma_id object_id) {
+void plasma_seal(plasma_store_conn *conn, object_id object_id) {
   plasma_request req = {.object_id = object_id};
   plasma_send_request(conn->conn, PLASMA_SEAL, &req);
 }
 
-void plasma_delete(plasma_store_conn *conn, plasma_id object_id) {
+void plasma_delete(plasma_store_conn *conn, object_id object_id) {
   plasma_request req = {.object_id = object_id};
   plasma_send_request(conn->conn, PLASMA_DELETE, &req);
 }
@@ -151,6 +170,11 @@ plasma_store_conn *plasma_store_connect(const char *socket_name) {
   result->conn = fd;
   result->mmap_table = NULL;
   return result;
+}
+
+void plasma_store_disconnect(plasma_store_conn *conn) {
+  close(conn->conn);
+  free(conn);
 }
 
 #define h_addr h_addr_list[0]
@@ -187,7 +211,7 @@ int plasma_manager_connect(const char *ip_addr, int port) {
 void plasma_transfer(int manager,
                      const char *addr,
                      int port,
-                     plasma_id object_id) {
+                     object_id object_id) {
   plasma_request req = {.object_id = object_id, .port = port};
   char *end = NULL;
   for (int i = 0; i < 4; ++i) {

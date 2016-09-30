@@ -1,6 +1,3 @@
-[submodule "thirdparty/common"]
-	path = thirdparty/common
-	url = https://github.com/ray-project/common.git
 [submodule "common"]
 	path = common
 	url = https://github.com/ray-project/common.git
