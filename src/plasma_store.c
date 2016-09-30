@@ -34,6 +34,9 @@
 void* dlmalloc(size_t);
 void dlfree(void*);
 
+/**
+ * This is used by the Plasma Store to send a reply to the Plasma Client.
+ */
 void plasma_send_reply(int fd, plasma_reply* reply) {
   int reply_count = sizeof(plasma_reply);
   if (write(fd, reply, reply_count) != reply_count) {
@@ -82,7 +85,7 @@ object_notify_entry* objects_notify = NULL;
 
 /* Create a new object buffer in the hash table. */
 void create_object(int conn, plasma_request* req) {
-  LOG_INFO("creating object"); /* TODO(pcm): add object_id here */
+  LOG_DEBUG("creating object"); /* TODO(pcm): add object_id here */
 
   object_table_entry* entry;
   HASH_FIND(handle, open_objects, &req->object_id, sizeof(object_id), entry);
@@ -131,7 +134,7 @@ void get_object(int conn, plasma_request* req) {
     send_fd(conn, entry->fd, (char*) &reply, sizeof(plasma_reply));
   } else {
     object_notify_entry* notify_entry;
-    LOG_INFO("object not in hash table of sealed objects");
+    LOG_DEBUG("object not in hash table of sealed objects");
     HASH_FIND(handle, objects_notify, &req->object_id, sizeof(object_id),
               notify_entry);
     if (!notify_entry) {
@@ -161,7 +164,7 @@ void check_if_object_present(int conn, plasma_request* req) {
 
 /* Seal an object that has been created in the hash table. */
 void seal_object(int conn, plasma_request* req) {
-  LOG_INFO("sealing object");  // TODO(pcm): add object_id here
+  LOG_DEBUG("sealing object");  // TODO(pcm): add object_id here
   object_table_entry* entry;
   HASH_FIND(handle, open_objects, &req->object_id, sizeof(object_id), entry);
   if (!entry) {
@@ -192,7 +195,7 @@ void seal_object(int conn, plasma_request* req) {
 
 /* Delete an object that has been created in the hash table. */
 void delete_object(int conn, plasma_request* req) {
-  LOG_INFO("deleting object");  // TODO(rkn): add object_id here
+  LOG_DEBUG("deleting object");  // TODO(rkn): add object_id here
   object_table_entry* entry;
   HASH_FIND(handle, sealed_objects, &req->object_id, sizeof(object_id), entry);
   /* TODO(rkn): This should probably not fail, but should instead throw an
@@ -230,7 +233,7 @@ void process_message(event_loop* loop,
     delete_object(client_sock, req);
     break;
   case DISCONNECT_CLIENT: {
-    LOG_INFO("Disconnecting client on fd %d", client_sock);
+    LOG_DEBUG("Disconnecting client on fd %d", client_sock);
     event_loop_remove_file(loop, client_sock);
   } break;
   default:
@@ -247,7 +250,7 @@ void new_client_connection(event_loop* loop,
   int new_socket = accept_client(listener_sock);
   event_loop_add_file(loop, new_socket, EVENT_LOOP_READ, process_message,
                       context);
-  LOG_INFO("new connection with fd %d", new_socket);
+  LOG_DEBUG("new connection with fd %d", new_socket);
 }
 
 void start_server(char* socket_name) {
@@ -275,6 +278,6 @@ int main(int argc, char* argv[]) {
     LOG_ERR("please specify socket for incoming connections with -s switch");
     exit(-1);
   }
-  LOG_INFO("starting server listening on %s", socket_name);
+  LOG_DEBUG("starting server listening on %s", socket_name);
   start_server(socket_name);
 }

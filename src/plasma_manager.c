@@ -82,7 +82,7 @@ void read_data(event_loop *loop, int data_sock, void *context, int events) {
   if (r == -1) {
     LOG_ERR("read error");
   } else if (r == 0) {
-    LOG_INFO("end of file");
+    LOG_DEBUG("end of file");
   } else {
     conn->cursor += r;
   }
@@ -166,15 +166,15 @@ void process_message(event_loop *loop,
 
   switch (type) {
   case PLASMA_TRANSFER:
-    LOG_INFO("transfering object to manager with port %d", req->port);
+    LOG_DEBUG("transfering object to manager with port %d", req->port);
     initiate_transfer(loop, req, conn);
     break;
   case PLASMA_DATA:
-    LOG_INFO("starting to stream data");
+    LOG_DEBUG("starting to stream data");
     start_reading_data(loop, client_sock, req, conn);
     break;
   case DISCONNECT_CLIENT: {
-    LOG_INFO("Disconnecting client on fd %d", client_sock);
+    LOG_DEBUG("Disconnecting client on fd %d", client_sock);
     event_loop_remove_file(loop, client_sock);
     close(client_sock);
     free(conn);
@@ -194,7 +194,7 @@ void new_client_connection(event_loop *loop,
   data_connection *conn = malloc(sizeof(data_connection));
   conn->store_conn = (plasma_store_conn *) context;
   event_loop_add_file(loop, new_socket, EVENT_LOOP_READ, process_message, conn);
-  LOG_INFO("new connection with fd %d", new_socket);
+  LOG_DEBUG("new connection with fd %d", new_socket);
 }
 
 void start_server(const char *store_socket_name,
@@ -211,17 +211,17 @@ void start_server(const char *store_socket_name,
   name.sin_addr.s_addr = htonl(INADDR_ANY);
   int on = 1;
   /* TODO(pcm): http://stackoverflow.com/q/1150635 */
-  if (ioctl(sock, FIONBIO, (char*) &on) < 0) {
+  if (ioctl(sock, FIONBIO, (char *) &on) < 0) {
     LOG_ERR("ioctl failed");
     close(sock);
     exit(-1);
   }
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-  if (bind(sock, (struct sockaddr*) &name, sizeof(name)) < 0) {
+  if (bind(sock, (struct sockaddr *) &name, sizeof(name)) < 0) {
     LOG_ERR("could not bind socket");
     exit(-1);
   }
-  LOG_INFO("listening on port %d", port);
+  LOG_DEBUG("listening on port %d", port);
   if (listen(sock, 5) == -1) {
     LOG_ERR("could not listen to socket");
     exit(-1);
@@ -229,8 +229,7 @@ void start_server(const char *store_socket_name,
 
   event_loop *loop = event_loop_create();
   plasma_store_conn *conn = plasma_store_connect(store_socket_name);
-  event_loop_add_file(loop, sock, EVENT_LOOP_READ, new_client_connection,
-                      conn);
+  event_loop_add_file(loop, sock, EVENT_LOOP_READ, new_client_connection, conn);
   event_loop_run(loop);
 }
 

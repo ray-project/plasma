@@ -76,10 +76,10 @@ void plasma_create(plasma_store_conn *conn,
                    uint8_t *metadata,
                    int64_t metadata_size,
                    uint8_t **data) {
-  LOG_INFO("called plasma_create on conn %d with size %" PRId64
-           " and metadata size "
-           "%" PRId64,
-           conn->conn, data_size, metadata_size);
+  LOG_DEBUG("called plasma_create on conn %d with size %" PRId64
+            " and metadata size "
+            "%" PRId64,
+            conn->conn, data_size, metadata_size);
   plasma_request req = {.object_id = object_id,
                         .data_size = data_size,
                         .metadata_size = metadata_size};
