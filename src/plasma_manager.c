@@ -28,18 +28,13 @@
 #include "plasma_manager.h"
 
 typedef struct {
-  /* Connection to local plasma store. */
-  plasma_store_conn *conn;
-} plasma_manager_state;
-
-/* Initialize the plasma manager. This function initializes the event loop
- * of the plasma manager, and stores the address 'store_socket_name' of
- * the local plasma store socket. */
-void init_plasma_manager(plasma_manager_state *s,
-                         const char *store_socket_name) {
-  s->conn = plasma_store_connect(store_socket_name);
-  LOG_INFO("Connected to object store %s", store_socket_name);
-}
+  /* Connection to the local plasma store for reading or writing data. */
+  plasma_store_conn *store_conn;
+  /* Buffer this connection is reading from or writing to. */
+  plasma_buffer buf;
+  /* Current position in the buffer. */
+  int64_t cursor;
+} data_connection;
 
 void write_data(event_loop *loop, int data_sock, void *context, int events) {
   LOG_DEBUG("Writing data");
@@ -174,11 +169,10 @@ void new_client_connection(event_loop *loop,
                            int listener_sock,
                            void *context,
                            int events) {
-  plasma_manager_state *state = (plasma_manager_state *) context;
   int new_socket = accept_client(listener_sock);
   /* Create a new data connection context per client. */
   data_connection *conn = malloc(sizeof(data_connection));
-  conn->store_conn = state->conn;
+  conn->store_conn = (plasma_store_conn *) context;
   event_loop_add_file(loop, new_socket, EVENT_LOOP_READ, process_message, conn);
   LOG_INFO("new connection with fd %d", new_socket);
 }
@@ -214,10 +208,9 @@ void start_server(const char *store_socket_name,
   }
 
   event_loop *loop = event_loop_create();
-  plasma_manager_state state;
-  init_plasma_manager(&state, store_socket_name);
+  plasma_store_conn *conn = plasma_store_connect(store_socket_name);
   event_loop_add_file(loop, sock, EVENT_LOOP_READ, new_client_connection,
-                      &state);
+                      conn);
   event_loop_run(loop);
 }
 
