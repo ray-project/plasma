@@ -12,16 +12,15 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#include "common.h"
+#include "io.h"
 #include "plasma.h"
 #include "plasma_client.h"
 #include "fling.h"
 
-void plasma_send_request(int fd, plasma_request *req) {
+void plasma_send_request(int fd, int type, plasma_request *req) {
   int req_count = sizeof(plasma_request);
-  if (write(fd, req, req_count) != req_count) {
-    LOG_ERR("write error, fd = %d", fd);
-    exit(-1);
-  }
+  write_message(fd, type, req_count, (uint8_t *) req);
 }
 
 /* If the file descriptor fd has been mmapped in this client process before,
@@ -58,15 +57,14 @@ void plasma_create(plasma_store_conn *conn,
                    uint8_t *metadata,
                    int64_t metadata_size,
                    uint8_t **data) {
-  LOG_INFO(
-      "called plasma_create on conn %d with size %d and metadata size "
-      "%d" PRId64,
-      conn, size, metadata_size);
-  plasma_request req = {.type = PLASMA_CREATE,
-                        .object_id = object_id,
+  LOG_INFO("called plasma_create on conn %d with size %" PRId64
+           " and metadata size "
+           "%" PRId64,
+           conn->conn, data_size, metadata_size);
+  plasma_request req = {.object_id = object_id,
                         .data_size = data_size,
                         .metadata_size = metadata_size};
-  plasma_send_request(conn->conn, &req);
+  plasma_send_request(conn->conn, PLASMA_CREATE, &req);
   plasma_reply reply;
   int fd = recv_fd(conn->conn, (char *) &reply, sizeof(plasma_reply));
   assert(reply.data_size == data_size);
@@ -91,8 +89,8 @@ void plasma_get(plasma_store_conn *conn,
                 uint8_t **data,
                 int64_t *metadata_size,
                 uint8_t **metadata) {
-  plasma_request req = {.type = PLASMA_GET, .object_id = object_id};
-  plasma_send_request(conn->conn, &req);
+  plasma_request req = {.object_id = object_id};
+  plasma_send_request(conn->conn, PLASMA_GET, &req);
   plasma_reply reply;
   int fd = recv_fd(conn->conn, (char *) &reply, sizeof(plasma_reply));
   *data = lookup_or_mmap(conn, fd, reply.store_fd_val, reply.map_size) +
@@ -109,41 +107,34 @@ void plasma_get(plasma_store_conn *conn,
 void plasma_contains(plasma_store_conn *conn,
                      plasma_id object_id,
                      int *has_object) {
-  plasma_request req = {.type = PLASMA_CONTAINS, .object_id = object_id};
-  plasma_send_request(conn->conn, &req);
+  plasma_request req = {.object_id = object_id};
+  plasma_send_request(conn->conn, PLASMA_CONTAINS, &req);
   plasma_reply reply;
   int r = read(conn->conn, &reply, sizeof(plasma_reply));
-  PLASMA_CHECK(r != -1, "read error");
-  PLASMA_CHECK(r != 0, "connection disconnected");
+  CHECKM(r != -1, "read error");
+  CHECKM(r != 0, "connection disconnected");
   *has_object = reply.has_object;
 }
 
 void plasma_seal(plasma_store_conn *conn, plasma_id object_id) {
-  plasma_request req = {.type = PLASMA_SEAL, .object_id = object_id};
-  plasma_send_request(conn->conn, &req);
+  plasma_request req = {.object_id = object_id};
+  plasma_send_request(conn->conn, PLASMA_SEAL, &req);
 }
 
 void plasma_delete(plasma_store_conn *conn, plasma_id object_id) {
-  plasma_request req = {.type = PLASMA_DELETE, .object_id = object_id};
-  plasma_send_request(conn->conn, &req);
+  plasma_request req = {.object_id = object_id};
+  plasma_send_request(conn->conn, PLASMA_DELETE, &req);
 }
 
 plasma_store_conn *plasma_store_connect(const char *socket_name) {
   assert(socket_name);
-  struct sockaddr_un addr;
-  int fd;
-  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-    LOG_ERR("socket error");
-    exit(-1);
-  }
-  memset(&addr, 0, sizeof(addr));
-  addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, socket_name, sizeof(addr.sun_path) - 1);
   /* Try to connect to the Plasma store. If unsuccessful, retry several times.
    */
+  int fd = -1;
   int connected_successfully = 0;
   for (int num_attempts = 0; num_attempts < 50; ++num_attempts) {
-    if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == 0) {
+    fd = connect_ipc_sock(socket_name);
+    if (fd >= 0) {
       connected_successfully = 1;
       break;
     }
@@ -197,13 +188,12 @@ void plasma_transfer(int manager,
                      const char *addr,
                      int port,
                      plasma_id object_id) {
-  plasma_request req = {
-      .type = PLASMA_TRANSFER, .object_id = object_id, .port = port};
+  plasma_request req = {.object_id = object_id, .port = port};
   char *end = NULL;
   for (int i = 0; i < 4; ++i) {
     req.addr[i] = strtol(end ? end : addr, &end, 10);
     /* skip the '.' */
     end += 1;
   }
-  plasma_send_request(manager, &req);
+  plasma_send_request(manager, PLASMA_TRANSFER, &req);
 }

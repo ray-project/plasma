@@ -9,33 +9,6 @@
 
 #include "uthash.h"
 
-#ifdef NDEBUG
-#define LOG_DEBUG(M, ...)
-#else
-#define LOG_DEBUG(M, ...) \
-  fprintf(stderr, "[DEBUG] (%s:%d) " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
-#endif
-
-#ifdef PLASMA_LOGGIN_ON
-#define LOG_INFO(M, ...) \
-  fprintf(stderr, "[INFO] (%s:%d) " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
-#else
-#define LOG_INFO(M, ...)
-#endif
-
-#define LOG_ERR(M, ...)                                                     \
-  fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, \
-          errno == 0 ? "None" : strerror(errno), ##__VA_ARGS__)
-
-#define PLASMA_CHECK(CONDITION, M, ...)                                \
-  do {                                                                 \
-    if (!(CONDITION)) {                                                \
-      fprintf(stderr, "[FATAL] (%s:%d " #CONDITION ") \n" M, __FILE__, \
-              __LINE__);                                               \
-      exit(-1);                                                        \
-    }                                                                  \
-  } while (0)
-
 typedef struct {
   int64_t data_size;
   int64_t metadata_size;
@@ -46,9 +19,9 @@ typedef struct {
 /** Represents an object ID hash, can hold a full SHA1 hash. */
 typedef struct { unsigned char id[20]; } plasma_id;
 
-enum plasma_request_type {
+enum plasma_message_type {
   /** Create a new object. */
-  PLASMA_CREATE,
+  PLASMA_CREATE = 128,
   /** Get an object. */
   PLASMA_GET,
   /** Check if an object is present. */
@@ -64,8 +37,6 @@ enum plasma_request_type {
 };
 
 typedef struct {
-  /** The type of the request. */
-  int type;
   /** The ID of the object that the request is about. */
   plasma_id object_id;
   /** The size of the object's data. */
@@ -131,10 +102,11 @@ typedef struct {
  * the Plasma Manager.
  *
  * @param conn The file descriptor to use to send the request.
+ * @param type The type of request.
  * @param req The address of the request to send.
  * @return Void.
  */
-void plasma_send_request(int conn, plasma_request *req);
+void plasma_send_request(int conn, int type, plasma_request *req);
 
 /**
  * This is used by the Plasma Store to send a reply to the Plasma Client.

@@ -21,21 +21,18 @@
 #include <limits.h>
 #include <poll.h>
 
+#include "common.h"
+#include "event_loop.h"
+#include "io.h"
 #include "uthash.h"
 #include "fling.h"
 #include "malloc.h"
 #include "plasma.h"
-#include "event_loop.h"
 
 #define MAX_NUM_CLIENTS 100
 
 void* dlmalloc(size_t);
 void dlfree(void*);
-
-typedef struct {
-  /* Event loop for the plasma store. */
-  event_loop* loop;
-} plasma_store_state;
 
 void plasma_send_reply(int fd, plasma_reply* reply) {
   int reply_count = sizeof(plasma_reply);
@@ -43,11 +40,6 @@ void plasma_send_reply(int fd, plasma_reply* reply) {
     LOG_ERR("write error, fd = %d", fd);
     exit(-1);
   }
-}
-
-void init_state(plasma_store_state* s) {
-  s->loop = malloc(sizeof(event_loop));
-  event_loop_init(s->loop);
 }
 
 typedef struct {
@@ -94,7 +86,7 @@ void create_object(int conn, plasma_request* req) {
 
   object_table_entry* entry;
   HASH_FIND(handle, open_objects, &req->object_id, sizeof(plasma_id), entry);
-  PLASMA_CHECK(entry == NULL, "Cannot create object twice.");
+  CHECKM(entry == NULL, "Cannot create object twice.");
 
   uint8_t* pointer = dlmalloc(req->data_size + req->metadata_size);
   int fd;
@@ -150,8 +142,8 @@ void get_object(int conn, plasma_request* req) {
       HASH_ADD(handle, objects_notify, object_id, sizeof(plasma_id),
                notify_entry);
     }
-    PLASMA_CHECK(notify_entry->num_waiting < MAX_NUM_CLIENTS - 1,
-                 "This exceeds the maximum number of clients.");
+    CHECKM(notify_entry->num_waiting < MAX_NUM_CLIENTS - 1,
+           "This exceeds the maximum number of clients.");
     notify_entry->conn[notify_entry->num_waiting] = conn;
     notify_entry->num_waiting += 1;
   }
@@ -206,91 +198,65 @@ void delete_object(int conn, plasma_request* req) {
   /* TODO(rkn): This should probably not fail, but should instead throw an
    * error. Maybe we should also support deleting objects that have been created
    * but not sealed. */
-  PLASMA_CHECK(entry != NULL, "To delete an object it must have been sealed.");
+  CHECKM(entry != NULL, "To delete an object it must have been sealed.");
   uint8_t* pointer = entry->pointer;
   HASH_DELETE(handle, sealed_objects, entry);
   dlfree(pointer);
 }
 
-void process_event(int conn, plasma_request* req) {
-  switch (req->type) {
+void process_message(event_loop* loop,
+                     int client_sock,
+                     void* context,
+                     int events) {
+  int64_t type;
+  int64_t length;
+  plasma_request* req;
+  read_message(client_sock, &type, &length, (uint8_t**) &req);
+
+  switch (type) {
   case PLASMA_CREATE:
-    create_object(conn, req);
+    create_object(client_sock, req);
     break;
   case PLASMA_GET:
-    get_object(conn, req);
+    get_object(client_sock, req);
     break;
   case PLASMA_CONTAINS:
-    check_if_object_present(conn, req);
+    check_if_object_present(client_sock, req);
     break;
   case PLASMA_SEAL:
-    seal_object(conn, req);
+    seal_object(client_sock, req);
     break;
   case PLASMA_DELETE:
-    delete_object(conn, req);
+    delete_object(client_sock, req);
     break;
+  case DISCONNECT_CLIENT: {
+    LOG_INFO("Disconnecting client on fd %d", client_sock);
+    event_loop_remove_file(loop, client_sock);
+  } break;
   default:
-    LOG_ERR("invalid request %d", req->type);
-    exit(-1);
+    /* This code should be unreachable. */
+    CHECK(0);
   }
+  free(req);
 }
 
-void run_event_loop(int socket) {
-  plasma_store_state state;
-  init_state(&state);
-  event_loop_attach(state.loop, 0, NULL, socket, POLLIN);
-  plasma_request req;
-  while (1) {
-    int num_ready = event_loop_poll(state.loop);
-    if (num_ready < 0) {
-      LOG_ERR("poll failed");
-      exit(-1);
-    }
-    for (int i = 0; i < event_loop_size(state.loop); ++i) {
-      struct pollfd* waiting = event_loop_get(state.loop, i);
-      if (waiting->revents == 0)
-        continue;
-      if (waiting->fd == socket) {
-        /* Handle new incoming connections. */
-        int new_socket = accept(socket, NULL, NULL);
-        event_loop_attach(state.loop, 0, NULL, new_socket, POLLIN);
-        LOG_INFO("adding new client");
-      } else {
-        int r = read(waiting->fd, &req, sizeof(plasma_request));
-        if (r == -1) {
-          LOG_ERR("read error");
-          continue;
-        } else if (r == 0) {
-          LOG_INFO("connection %d disconnected", i);
-          event_loop_detach(state.loop, i, 1);
-        } else {
-          process_event(waiting->fd, &req);
-        }
-      }
-    }
-  }
+void new_client_connection(event_loop* loop,
+                           int listener_sock,
+                           void* context,
+                           int events) {
+  int new_socket = accept_client(listener_sock);
+  event_loop_add_file(loop, new_socket, EVENT_LOOP_READ, process_message,
+                      context);
+  LOG_INFO("new connection with fd %d", new_socket);
 }
 
 void start_server(char* socket_name) {
-  int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (fd == -1) {
-    LOG_ERR("socket error");
-    exit(-1);
-  }
-  int on = 1;
-  if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*) &on, sizeof(on)) < 0) {
-    LOG_ERR("setsockopt failed");
-    close(fd);
-    exit(-1);
-  }
-  struct sockaddr_un addr;
-  memset(&addr, 0, sizeof(addr));
-  addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, socket_name, sizeof(addr.sun_path) - 1);
-  unlink(socket_name);
-  bind(fd, (struct sockaddr*) &addr, sizeof(addr));
-  listen(fd, 5);
-  run_event_loop(fd);
+  int socket = bind_ipc_sock(socket_name);
+  CHECK(socket >= 0);
+  event_loop* loop = event_loop_create();
+  event_loop_add_file(loop, socket, EVENT_LOOP_READ, new_client_connection,
+                      NULL);
+  event_loop_run(loop);
 }
 
 int main(int argc, char* argv[]) {

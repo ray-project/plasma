@@ -13,9 +13,10 @@
 #include <assert.h>
 
 #include "plasma.h"
+#include "plasma_client.h"
 
 int main(int argc, char *argv[]) {
-  int conn = -1;
+  plasma_store_conn *conn = NULL;
   int64_t size;
   uint8_t *data;
   int c;
@@ -27,11 +28,11 @@ int main(int argc, char *argv[]) {
       conn = plasma_store_connect(optarg);
       break;
     case 'c':
-      assert(conn != -1);
+      assert(conn != NULL);
       plasma_create(conn, id, 100, NULL, 0, &data);
       break;
     case 'f':
-      assert(conn != -1);
+      assert(conn != NULL);
       plasma_seal(conn, id);
       break;
     case 'g':
@@ -41,6 +42,6 @@ int main(int argc, char *argv[]) {
       abort();
     }
   }
-  assert(conn != -1);
-  close(conn);
+  assert(conn != NULL);
+  close(conn->conn);
 }
