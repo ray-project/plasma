@@ -50,8 +50,9 @@ class TestPlasmaClient(unittest.TestCase):
     self.plasma_client = plasma.PlasmaClient(store_name)
 
   def tearDown(self):
-    # Kill the plasma store process.
+    # Kill the plasma store process and give it some time to clean up.
     self.p.kill()
+    time.sleep(1)
 
   def test_create(self):
     # Create an object id string.
@@ -194,6 +195,7 @@ class TestPlasmaManager(unittest.TestCase):
     self.p3.kill()
     self.p4.kill()
     self.p5.kill()
+    time.sleep(1)
 
   def test_transfer(self):
     for _ in range(100):
