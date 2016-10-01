@@ -44,7 +44,7 @@ struct mmap_record {
 struct mmap_record *records_by_fd = NULL;
 struct mmap_record *records_by_pointer = NULL;
 
-const double GRANULARITY_MULTIPLIER = 2;
+const int GRANULARITY_MULTIPLIER = 2;
 
 /* Create a buffer. This is creating a temporary file and then
  * immediately unlinking it so we do not leave traces in the system. */
@@ -84,7 +84,7 @@ void *fake_mmap(size_t size) {
   }
 
   /* Update dlmalloc's allocation granularity for future calls */
-  dlmalloc_granularity = (size_t) dlmalloc_granularity * GRANULARITY_MULTIPLIER;
+  dlmalloc_granularity *= GRANULARITY_MULTIPLIER;
   dlmallopt(M_GRANULARITY, dlmalloc_granularity);
 
   struct mmap_record *record = malloc(sizeof(struct mmap_record));
