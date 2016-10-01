@@ -17,6 +17,7 @@
 #include "plasma.h"
 #include "plasma_client.h"
 #include "fling.h"
+#include "uthash.h"
 
 struct client_mmap_table_entry_impl {
   /** Key that uniquely identifies the  memory mapped file. In practice, we

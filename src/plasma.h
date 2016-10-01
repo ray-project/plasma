@@ -7,7 +7,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "uthash.h"
 #include "common.h"
 
 typedef struct {
