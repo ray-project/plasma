@@ -16,6 +16,34 @@ typedef struct {
   int64_t construct_duration;
 } plasma_object_info;
 
+/* Handle to access memory mapped file and map it into client address space */
+typedef struct {
+  /** The file descriptor of the memory mapped file in the store. It is used
+   * as a unique identifier of the file in the client to look up the
+   * corresponding file descriptor on the client's side. */
+  int store_fd;
+  /** The size in bytes of the memory mapped file. */
+  int64_t mmap_size;
+} object_handle;
+
+typedef struct {
+  /** Handle for memory mapped file the object is stored in. */
+  object_handle handle;
+  /** The offset in bytes in the memory mapped file of the data. */
+  ptrdiff_t data_offset;
+  /** The offset in bytes in the memory mapped file of the metadata. */
+  ptrdiff_t metadata_offset;
+  /** The size in bytes of the data. */
+  int64_t data_size;
+  /** The size in bytes of the metadata. */
+  int64_t metadata_size;
+} plasma_object;
+
+enum object_status {
+  OBJECT_NOT_FOUND = 0,
+  OBJECT_FOUND = 1
+};
+
 enum plasma_message_type {
   /** Create a new object. */
   PLASMA_CREATE = 128,
@@ -49,21 +77,11 @@ typedef struct {
 } plasma_request;
 
 typedef struct {
-  /** The offset in bytes in the memory mapped file of the data. */
-  ptrdiff_t data_offset;
-  /** The offset in bytes in the memory mapped file of the metadata. */
-  ptrdiff_t metadata_offset;
-  /** The size in bytes of the memory mapped file. */
-  int64_t map_size;
-  /** The size in bytesof the data. */
-  int64_t data_size;
-  /** The size in bytes of the metadata. */
-  int64_t metadata_size;
+  /** The object that is returned with this reply. */
+  plasma_object object;
   /** This is used only to respond to requests of type PLASMA_CONTAINS. It is 1
    *  if the object is present and 0 otherwise. Used for plasma_contains. */
   int has_object;
-  /** The file descriptor of the memory mapped file in the store. */
-  int store_fd_val;
 } plasma_reply;
 
 #endif

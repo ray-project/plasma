@@ -87,18 +87,19 @@ void plasma_create(plasma_store_conn *conn,
   plasma_send_request(conn->conn, PLASMA_CREATE, &req);
   plasma_reply reply;
   int fd = recv_fd(conn->conn, (char *) &reply, sizeof(plasma_reply));
-  assert(reply.data_size == data_size);
-  assert(reply.metadata_size == metadata_size);
+  plasma_object *object = &reply.object;
+  CHECK(object->data_size == data_size);
+  CHECK(object->metadata_size == metadata_size);
   /* The metadata should come right after the data. */
-  assert(reply.metadata_offset == reply.data_offset + data_size);
-  *data = lookup_or_mmap(conn, fd, reply.store_fd_val, reply.map_size) +
-          reply.data_offset;
+  CHECK(object->metadata_offset == object->data_offset + data_size);
+  *data = lookup_or_mmap(conn, fd, object->handle.store_fd, object->handle.mmap_size) +
+          object->data_offset;
   /* If plasma_create is being called from a transfer, then we will not copy the
    * metadata here. The metadata will be written along with the data streamed
    * from the transfer. */
   if (metadata != NULL) {
     /* Copy the metadata to the buffer. */
-    memcpy(*data + reply.data_size, metadata, metadata_size);
+    memcpy(*data + object->data_size, metadata, metadata_size);
   }
 }
 
@@ -113,13 +114,14 @@ void plasma_get(plasma_store_conn *conn,
   plasma_send_request(conn->conn, PLASMA_GET, &req);
   plasma_reply reply;
   int fd = recv_fd(conn->conn, (char *) &reply, sizeof(plasma_reply));
-  *data = lookup_or_mmap(conn, fd, reply.store_fd_val, reply.map_size) +
-          reply.data_offset;
-  *size = reply.data_size;
+  plasma_object *object = &reply.object;
+  *data = lookup_or_mmap(conn, fd, object->handle.store_fd, object->handle.mmap_size) +
+          object->data_offset;
+  *size = object->data_size;
   /* If requested, return the metadata as well. */
   if (metadata != NULL) {
-    *metadata = *data + reply.data_size;
-    *metadata_size = reply.metadata_size;
+    *metadata = *data + object->data_size;
+    *metadata_size = object->metadata_size;
   }
 }
 
