@@ -139,6 +139,7 @@ void transfer_data(event_loop *loop, int data_sock, void *context, int events) {
     LOG_DEBUG("writing on channel %d finished", data_sock);
     conn->cursor = 0;
     LL_DELETE(conn->transfer_queue, buf);
+    free(buf);
   }
 }
 
@@ -166,6 +167,7 @@ void read_data(event_loop *loop, int data_sock, void *context, int events) {
     LOG_DEBUG("reading on channel %d finished", data_sock);
     plasma_seal(conn->manager_state->store_conn, buf->object_id);
     LL_DELETE(conn->transfer_queue, buf);
+    free(buf);
     /* Switch to listening for requests from this socket, instead of reading
      * data. */
     event_loop_remove_file(loop, data_sock);
@@ -291,6 +293,8 @@ void process_message(event_loop *loop,
     LOG_ERR("invalid request %" PRId64, type);
     exit(-1);
   }
+  
+  free(req);
 }
 
 void new_client_connection(event_loop *loop,
