@@ -218,7 +218,7 @@ void initiate_transfer(event_loop *loop,
     transfer_conn->cursor = 0;
 
     manager_conn = malloc(sizeof(plasma_manager_connection));
-    manager_conn->ip_addr_port = utstring_body(ip_addr_port);
+    manager_conn->ip_addr_port = strdup(utstring_body(ip_addr_port));
     manager_conn->conn = transfer_conn;
     HASH_ADD_KEYPTR(hh, transfer_conn->manager_state->manager_connections,
                     manager_conn->ip_addr_port,

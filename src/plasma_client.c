@@ -19,7 +19,7 @@
 #include "fling.h"
 #include "uthash.h"
 
-struct client_mmap_table_entry_impl {
+typedef struct {
   /** Key that uniquely identifies the  memory mapped file. In practice, we
    *  take the numerical value of the file descriptor in the object store. */
   int key;
@@ -27,7 +27,7 @@ struct client_mmap_table_entry_impl {
   uint8_t *pointer;
   /** Handle for the uthash table. */
   UT_hash_handle hh;
-};
+} client_mmap_table_entry;
 
 /** Information about a connection between a Plasma Client and Plasma Store.
  *  This is used to avoid mapping the same files into memory multiple times. */

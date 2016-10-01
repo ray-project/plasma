@@ -1,7 +1,6 @@
 #ifndef PLASMA_CLIENT_H
 #define PLASMA_CLIENT_H
 
-typedef struct client_mmap_table_entry_impl client_mmap_table_entry;
 typedef struct plasma_store_conn_impl plasma_store_conn;
 
 /**

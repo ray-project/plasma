@@ -7,4 +7,4 @@
 /* The buffer size in bytes. Data will get transfered in multiples of this */
 #define BUFSIZE 4096
 
-#endif
+#endif /* PLASMA_MANAGER_H */
