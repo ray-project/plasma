@@ -201,32 +201,30 @@ void process_message(event_loop* loop,
                      int client_sock,
                      void* context,
                      int events) {
-  int64_t type;
-  int64_t length;
-  plasma_request* req;
-  read_message(client_sock, &type, &length, (uint8_t**) &req);
+  plasma_request req;
+  CHECK(read(client_sock, &req, sizeof(req)) == sizeof(req));
   plasma_reply reply;
   memset(&reply, 0, sizeof(reply));
   UT_array *conns;
 
-  switch (type) {
+  switch (req.type) {
   case PLASMA_CREATE:
-    create_object(client_sock, req->object_id, req->data_size, req->metadata_size, &reply.object);
+    create_object(client_sock, req.object_id, req.data_size, req.metadata_size, &reply.object);
     send_fd(client_sock, reply.object.handle.store_fd, (char*) &reply, sizeof(reply));
     break;
   case PLASMA_GET:
-    if (get_object(client_sock, req->object_id, &reply.object) == OBJECT_FOUND) {
+    if (get_object(client_sock, req.object_id, &reply.object) == OBJECT_FOUND) {
       send_fd(client_sock, reply.object.handle.store_fd, (char*) &reply, sizeof(reply));
     }
     break;
   case PLASMA_CONTAINS:
-    if (contains_object(client_sock, req->object_id) == OBJECT_FOUND) {
+    if (contains_object(client_sock, req.object_id) == OBJECT_FOUND) {
       reply.has_object = 1;
     }
     plasma_send_reply(client_sock, &reply);
     break;
   case PLASMA_SEAL:
-    seal_object(client_sock, req->object_id, &conns, &reply.object);
+    seal_object(client_sock, req.object_id, &conns, &reply.object);
     if (conns) {
      for (int *c = (int *) utarray_front(conns); c != NULL;
        c = (int *) utarray_next(conns, c)) {
@@ -236,7 +234,7 @@ void process_message(event_loop* loop,
     }
     break;
   case PLASMA_DELETE:
-    delete_object(client_sock, req->object_id);
+    delete_object(client_sock, req.object_id);
     break;
   case DISCONNECT_CLIENT: {
     LOG_DEBUG("Disconnecting client on fd %d", client_sock);
@@ -246,8 +244,6 @@ void process_message(event_loop* loop,
     /* This code should be unreachable. */
     CHECK(0);
   }
-
-  free(req);
 }
 
 void new_client_connection(event_loop* loop,

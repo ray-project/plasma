@@ -111,10 +111,11 @@ void write_object_chunk(event_loop *loop, int data_sock, void *context, int even
   if (conn->cursor == 0) {
     /* If the cursor is zero, we haven't sent any requests for this object yet,
      * so send the initial PLASMA_DATA request. */
-    plasma_request manager_req = {.object_id = buf->object_id,
-                                  .data_size = buf->data_size,
-                                  .metadata_size = buf->metadata_size};
-    plasma_send_request(conn->fd, PLASMA_DATA, &manager_req);
+    plasma_request req = {.type = PLASMA_DATA,
+                          .object_id = buf->object_id,
+                          .data_size = buf->data_size,
+                          .metadata_size = buf->metadata_size};
+    CHECK(write(conn->fd, &req, sizeof(req)) == sizeof(req));
   }
 
   /* Try to write one BUFSIZE at a time. */
@@ -266,19 +267,17 @@ void process_message(event_loop *loop,
                      int events) {
   data_connection *conn = (data_connection *) context;
 
-  int64_t type;
-  int64_t length;
-  plasma_request *req;
-  read_message(client_sock, &type, &length, (uint8_t **) &req);
+  plasma_request req;
+  CHECK(read(client_sock, &req, sizeof(req)) == sizeof(req));
 
-  switch (type) {
+  switch (req.type) {
   case PLASMA_TRANSFER:
-    LOG_DEBUG("transfering object to manager with port %d", req->port);
-    start_writing_data(loop, req->object_id, req->addr, req->port, conn);
+    LOG_DEBUG("transfering object to manager with port %d", req.port);
+    start_writing_data(loop, req.object_id, req.addr, req.port, conn);
     break;
   case PLASMA_DATA:
     LOG_DEBUG("starting to stream data");
-    start_reading_data(loop, client_sock, req->object_id, req->data_size, req->metadata_size, conn);
+    start_reading_data(loop, client_sock, req.object_id, req.data_size, req.metadata_size, conn);
     break;
   case DISCONNECT_CLIENT: {
     LOG_INFO("Disconnecting client on fd %d", client_sock);
@@ -287,11 +286,9 @@ void process_message(event_loop *loop,
     free(conn);
   } break;
   default:
-    LOG_ERR("invalid request %" PRId64, type);
+    LOG_ERR("invalid request %" PRId64, req.type);
     exit(-1);
   }
-  
-  free(req);
 }
 
 void new_client_connection(event_loop *loop,
