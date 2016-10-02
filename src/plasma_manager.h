@@ -4,7 +4,8 @@
 #include <poll.h>
 #include "utarray.h"
 
-typedef struct data_connection_impl data_connection;
+typedef struct data_connection data_connection;
+typedef struct plasma_manager_state plasma_manager_state;
 
 /**
  * Start transfering data to another object store manager.
@@ -43,6 +44,8 @@ void start_reading_data(event_loop *loop,
                         int64_t data_size,
                         int64_t metadata_size,
                         data_connection *conn);
+
+void fetch_object(plasma_manager_state *state, object_id object_id);
 
 /** 
  * Read the next chunk of the object in transit from the plasma manager

@@ -59,6 +59,8 @@ enum plasma_message_type {
   PLASMA_TRANSFER,
   /** Header for sending data. */
   PLASMA_DATA,
+  /** Fetching object from a plasma manager that has the object. */
+  PLASMA_FETCH
 };
 
 typedef struct {

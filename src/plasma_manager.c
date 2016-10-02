@@ -32,13 +32,13 @@
 
 typedef struct plasma_manager_connection_impl plasma_manager_connection;
 
-typedef struct {
+struct plasma_manager_state {
   /** Connection to the local plasma store for reading or writing data. */
   plasma_store_conn *store_conn;
   /** Hash table of all contexts for active connections to other plasma
    * managers. These are used for writing data to other plasma stores. */
   plasma_manager_connection *manager_connections;
-} plasma_manager_state;
+};
 
 typedef struct plasma_buffer plasma_buffer;
 
@@ -56,30 +56,31 @@ struct plasma_buffer {
   plasma_buffer *next;
 };
 
-/* Context for a client connection to another plasma manager. */
-struct data_connection_impl {
-  /* Current state for this plasma manager. This is shared between all client
-   * connections to the plasma manager. */
+/*
+struct fetch_context {
   plasma_manager_state *manager_state;
-  /* Current position in the buffer. */
-  int64_t cursor;
-  /* Buffer that this connection is reading from. If this is a connection to
+  
+};
+*/
+
+typedef struct {
+  /** Key that uniquely identifies the plasma manager that we're connected to.
+   * We will use the string <address>:<port> as an identifier. */
+  char *ip_addr_port;
+  /** Current state for this plasma manager. This is shared between all client
+   * connections to the plasma manager. */
+  plasma_manager_state *state;
+  /** Buffer that this connection is reading from. If this is a connection to
    * write data to another plasma store, then it is a linked list of buffers to
    * write. */
   plasma_buffer *transfer_queue;
-  /* File descriptor for the socket connected to the other plasma manager. */
+  /** Current position in the buffer. */
+  int64_t cursor;
+  /** File descriptor for the socket connected to the other plasma manager. */
   int fd;
-};
-
-struct plasma_manager_connection_impl {
-  /* Key that uniquely identifies the plasma manager that we're connected to.
-   * We will use the string <address>:<port> as an identifier. */
-  char *ip_addr_port;
-  /* The context for our client connection to the other plasma manager. */
-  data_connection *conn;
   /** Handle for the uthash table. */
   UT_hash_handle hh;
-};
+} plasma_manager_connection;
 
 plasma_manager_state *init_plasma_manager_state(const char *store_socket_name) {
   plasma_manager_state *state = malloc(sizeof(plasma_manager_state));
@@ -96,7 +97,7 @@ void process_message(event_loop *loop,
                      int events);
 
 void write_object_chunk(event_loop *loop, int data_sock, void *context, int events) {
-  data_connection *conn = (data_connection *) context;
+  plasma_manager_connection *conn = (plasma_manager_connection *) context;
   if (conn->transfer_queue == NULL) {
     /* If there are no objects to transfer, temporarily remove this connection
      * from the event loop. It will be reawoken when we receive another
@@ -146,7 +147,7 @@ void write_object_chunk(event_loop *loop, int data_sock, void *context, int even
 void read_object_chunk(event_loop *loop, int data_sock, void *context, int events) {
   LOG_DEBUG("Reading data");
   ssize_t r, s;
-  data_connection *conn = (data_connection *) context;
+  plasma_manager_connection *conn = (plasma_manager_connection *) context;
   plasma_buffer *buf = conn->transfer_queue;
   CHECK(buf != NULL);
   /* Try to read one BUFSIZE at a time. */
@@ -177,11 +178,33 @@ void read_object_chunk(event_loop *loop, int data_sock, void *context, int event
   return;
 }
 
+/* Get connection to plasma manager or create one if it does not exist. */
+plasma_manager_connection *plasma_manager_connection(plasma_manager_state *state, const char *ip_addr, int port) {
+  UT_string *ip_addr_port;
+  utstring_new(ip_addr_port);
+  utstring_printf(ip_addr_port, "%s:%d", ip_addr, port);
+  plasma_manager_connection *manager_conn;
+  HASH_FIND_STR(state->manager_connections,
+                utstring_body(ip_addr_port), manager_conn);
+  if (!manager_conn) {
+    manager_conn = malloc(sizeof(plasma_manager_connection));
+    manager_conn->fd = plasma_manager_connect(ip_addr, port);
+    manager_conn->transfer_queue = NULL;
+    manager_conn->cursor = 0;
+    manager_conn->ip_addr_port = strdup(ip_addr_port);
+    HASH_ADD_KEYPTR(hh, state->manager_connections,
+                    manager_conn->ip_addr_port,
+                    strlen(manager_conn->ip_addr_port), manager_conn);
+  }
+  utstring_free(ip_addr_port);
+  return manager_conn;
+}
+
 void start_writing_data(event_loop *loop,
                         object_id object_id,
                         uint8_t addr[4],
                         int port,
-                        data_connection *conn) {
+                        plasma_manager_connection *conn) {
   uint8_t *data;
   int64_t data_size;
   uint8_t *metadata;
@@ -199,35 +222,12 @@ void start_writing_data(event_loop *loop,
 
   /* Look to see if we already have a connection to this plasma manager. */
   UT_string *ip_addr;
-  UT_string *ip_addr_port;
   utstring_new(ip_addr);
-  utstring_new(ip_addr_port);
   utstring_printf(ip_addr, "%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3]);
-  utstring_printf(ip_addr_port, "%s:%d", utstring_body(ip_addr), port);
-  plasma_manager_connection *manager_conn;
-  HASH_FIND_STR(conn->manager_state->manager_connections,
-                utstring_body(ip_addr_port), manager_conn);
-
-  if (!manager_conn) {
-    /* If we don't already have a connection to this manager, start one. */
-    data_connection *transfer_conn = malloc(sizeof(data_connection));
-    transfer_conn->fd =
-        plasma_manager_connect(utstring_body(ip_addr), port);
-    transfer_conn->manager_state = conn->manager_state;
-    transfer_conn->transfer_queue = NULL;
-    transfer_conn->cursor = 0;
-
-    manager_conn = malloc(sizeof(plasma_manager_connection));
-    manager_conn->ip_addr_port = strdup(utstring_body(ip_addr_port));
-    manager_conn->conn = transfer_conn;
-    HASH_ADD_KEYPTR(hh, transfer_conn->manager_state->manager_connections,
-                    manager_conn->ip_addr_port,
-                    strlen(manager_conn->ip_addr_port), manager_conn);
-  }
-  utstring_free(ip_addr_port);
+  plasma_manager_connection *other_conn = plasma_manager_connection(conn->state);
   utstring_free(ip_addr);
 
-  if (manager_conn->conn->transfer_queue == NULL) {
+  if (other_conn->transfer_queue == NULL) {
     /* If we already have a connection to this manager and its inactive,
      * (re)register it with the event loop again. */
     event_loop_add_file(loop, manager_conn->conn->fd, EVENT_LOOP_WRITE,
@@ -258,6 +258,20 @@ void start_reading_data(event_loop *loop,
    * other requests. */
   event_loop_remove_file(loop, client_sock);
   event_loop_add_file(loop, client_sock, EVENT_LOOP_READ, read_object_chunk, conn);
+}
+
+int64_t fetch_timer_callback(event_loop *loop, int64_t id, void *context) {
+  
+}
+
+void fetch_object_callback(object_id object_id, int manager_count, const char *manager_vector[]) {
+  int manager_conn = plasma_manager_connect(...)
+  plasma_request
+  plasma_send_request(manager_conn, PLASMA_TRANSFER)
+}
+
+void fetch_object(plasma_manager_state *state, object_id object_id) {
+  object_table_lookup(state->db, object_id, fetch_object_callback);
 }
 
 void process_message(event_loop *loop,
@@ -308,7 +322,7 @@ void new_client_connection(event_loop *loop,
 }
 
 void start_server(const char *store_socket_name,
-                  const char *master_addr,
+                  const char *manager_addr,
                   int port) {
   struct sockaddr_in name;
   int sock = socket(PF_INET, SOCK_STREAM, 0);
@@ -348,7 +362,7 @@ int main(int argc, char *argv[]) {
   /* Socket name of the plasma store this manager is connected to. */
   char *store_socket_name = NULL;
   /* IP address of this node. */
-  char *master_addr = NULL;
+  char *manager_addr = NULL;
   /* Port number the manager should use. */
   int port;
   int c;
@@ -358,7 +372,7 @@ int main(int argc, char *argv[]) {
       store_socket_name = optarg;
       break;
     case 'm':
-      master_addr = optarg;
+      manager_addr = optarg;
       break;
     case 'p':
       port = atoi(optarg);
@@ -374,11 +388,11 @@ int main(int argc, char *argv[]) {
         "switch");
     exit(-1);
   }
-  if (!master_addr) {
+  if (!manager_addr) {
     LOG_ERR(
         "please specify ip address of the current host in the format "
         "123.456.789.10 with -m switch");
     exit(-1);
   }
-  start_server(store_socket_name, master_addr, port);
+  start_server(store_socket_name, manager_addr, port);
 }
