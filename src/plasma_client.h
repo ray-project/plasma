@@ -8,10 +8,11 @@ typedef struct plasma_store_conn_impl plasma_store_conn;
  * the Plasma Manager.
  *
  * @param conn The file descriptor to use to send the request.
+ * @param type The type of request.
  * @param req The address of the request to send.
  * @return Void.
  */
-void plasma_send_request(int conn, plasma_request *req);
+void plasma_send_request(int conn, int type, plasma_request *req);
 
 /**
  * Connect to the local plasma store UNIX domain socket with path socket_name

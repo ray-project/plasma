@@ -38,8 +38,9 @@ struct plasma_store_conn_impl {
   client_mmap_table_entry *mmap_table;
 };
 
-void plasma_send_request(int fd, plasma_request *req) {
-  CHECK(write(fd, req, sizeof(plasma_request)) == sizeof(plasma_request));
+void plasma_send_request(int fd, int type, plasma_request *req) {
+  int req_count = sizeof(plasma_request);
+  write_message(fd, type, req_count, (uint8_t *) req);
 }
 
 /* If the file descriptor fd has been mmapped in this client process before,
@@ -80,11 +81,10 @@ void plasma_create(plasma_store_conn *conn,
             " and metadata size "
             "%" PRId64,
             conn->conn, data_size, metadata_size);
-  plasma_request req = {.type = PLASMA_CREATE,
-                        .object_id = object_id,
+  plasma_request req = {.object_id = object_id,
                         .data_size = data_size,
                         .metadata_size = metadata_size};
-  plasma_send_request(conn->conn, &req);
+  plasma_send_request(conn->conn, PLASMA_CREATE, &req);
   plasma_reply reply;
   int fd = recv_fd(conn->conn, (char *) &reply, sizeof(plasma_reply));
   plasma_object *object = &reply.object;
@@ -111,8 +111,8 @@ void plasma_get(plasma_store_conn *conn,
                 uint8_t **data,
                 int64_t *metadata_size,
                 uint8_t **metadata) {
-  plasma_request req = {.type = PLASMA_GET, .object_id = object_id};
-  plasma_send_request(conn->conn, &req);
+  plasma_request req = {.object_id = object_id};
+  plasma_send_request(conn->conn, PLASMA_GET, &req);
   plasma_reply reply;
   int fd = recv_fd(conn->conn, (char *) &reply, sizeof(plasma_reply));
   plasma_object *object = &reply.object;
@@ -131,8 +131,8 @@ void plasma_get(plasma_store_conn *conn,
 void plasma_contains(plasma_store_conn *conn,
                      object_id object_id,
                      int *has_object) {
-  plasma_request req = {.type = PLASMA_CONTAINS, .object_id = object_id};
-  plasma_send_request(conn->conn, &req);
+  plasma_request req = {.object_id = object_id};
+  plasma_send_request(conn->conn, PLASMA_CONTAINS, &req);
   plasma_reply reply;
   int r = read(conn->conn, &reply, sizeof(plasma_reply));
   CHECKM(r != -1, "read error");
@@ -141,13 +141,13 @@ void plasma_contains(plasma_store_conn *conn,
 }
 
 void plasma_seal(plasma_store_conn *conn, object_id object_id) {
-  plasma_request req = {.type = PLASMA_SEAL, .object_id = object_id};
-  plasma_send_request(conn->conn, &req);
+  plasma_request req = {.object_id = object_id};
+  plasma_send_request(conn->conn, PLASMA_SEAL, &req);
 }
 
 void plasma_delete(plasma_store_conn *conn, object_id object_id) {
-  plasma_request req = {.type = PLASMA_DELETE, .object_id = object_id};
-  plasma_send_request(conn->conn, &req);
+  plasma_request req = {.object_id = object_id};
+  plasma_send_request(conn->conn, PLASMA_DELETE, &req);
 }
 
 plasma_store_conn *plasma_store_connect(const char *socket_name) {
@@ -217,13 +217,12 @@ void plasma_transfer(int manager,
                      const char *addr,
                      int port,
                      object_id object_id) {
-  plasma_request req = {
-      .type = PLASMA_TRANSFER, .object_id = object_id, .port = port};
+  plasma_request req = {.object_id = object_id, .port = port};
   char *end = NULL;
   for (int i = 0; i < 4; ++i) {
     req.addr[i] = strtol(end ? end : addr, &end, 10);
     /* skip the '.' */
     end += 1;
   }
-  plasma_send_request(manager, &req);
+  plasma_send_request(manager, PLASMA_TRANSFER, &req);
 }

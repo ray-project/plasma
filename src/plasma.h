@@ -59,8 +59,6 @@ enum plasma_message_type {
 };
 
 typedef struct {
-  /** Type of this request (plasma_message_type). */
-  int64_t type;
   /** The ID of the object that the request is about. */
   object_id object_id;
   /** The size of the object's data. */
