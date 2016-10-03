@@ -10,7 +10,11 @@
  * @param data_size Size in bytes of the object to be created.
  * @param metadata_size Size in bytes of the object metadata.
  */
-void create_object(int conn, object_id object_id, int64_t data_size, int64_t metadata_size, plasma_object *result);
+void create_object(int conn,
+                   object_id object_id,
+                   int64_t data_size,
+                   int64_t metadata_size,
+                   plasma_object *result);
 
 /**
  * Get an object:
@@ -30,7 +34,10 @@ int get_object(int conn, object_id object_id, plasma_object *result);
  *
  * Should notify all the sockets waiting for the object.
  */
-plasma_object seal_object(int conn, object_id object_id, UT_array **conns, plasma_object *result);
+plasma_object seal_object(int conn,
+                          object_id object_id,
+                          UT_array **conns,
+                          plasma_object *result);
 
 /**
  * Check if the plasma store contains an object:

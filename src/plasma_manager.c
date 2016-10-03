@@ -95,7 +95,10 @@ void process_message(event_loop *loop,
                      void *context,
                      int events);
 
-void write_object_chunk(event_loop *loop, int data_sock, void *context, int events) {
+void write_object_chunk(event_loop *loop,
+                        int data_sock,
+                        void *context,
+                        int events) {
   data_connection *conn = (data_connection *) context;
   if (conn->transfer_queue == NULL) {
     /* If there are no objects to transfer, temporarily remove this connection
@@ -144,7 +147,10 @@ void write_object_chunk(event_loop *loop, int data_sock, void *context, int even
   }
 }
 
-void read_object_chunk(event_loop *loop, int data_sock, void *context, int events) {
+void read_object_chunk(event_loop *loop,
+                       int data_sock,
+                       void *context,
+                       int events) {
   LOG_DEBUG("Reading data");
   ssize_t r, s;
   data_connection *conn = (data_connection *) context;
@@ -212,8 +218,7 @@ void start_writing_data(event_loop *loop,
   if (!manager_conn) {
     /* If we don't already have a connection to this manager, start one. */
     data_connection *transfer_conn = malloc(sizeof(data_connection));
-    transfer_conn->fd =
-        plasma_manager_connect(utstring_body(ip_addr), port);
+    transfer_conn->fd = plasma_manager_connect(utstring_body(ip_addr), port);
     transfer_conn->manager_state = conn->manager_state;
     transfer_conn->transfer_queue = NULL;
     transfer_conn->cursor = 0;
@@ -250,15 +255,16 @@ void start_reading_data(event_loop *loop,
   buf->metadata_size = metadata_size;
   buf->writable = 1;
 
-  plasma_create(conn->manager_state->store_conn, object_id, data_size,
-                NULL, metadata_size, &(buf->data));
+  plasma_create(conn->manager_state->store_conn, object_id, data_size, NULL,
+                metadata_size, &(buf->data));
   LL_APPEND(conn->transfer_queue, buf);
   conn->cursor = 0;
 
   /* Switch to reading the data from this socket, instead of listening for
    * other requests. */
   event_loop_remove_file(loop, client_sock);
-  event_loop_add_file(loop, client_sock, EVENT_LOOP_READ, read_object_chunk, conn);
+  event_loop_add_file(loop, client_sock, EVENT_LOOP_READ, read_object_chunk,
+                      conn);
 }
 
 void process_message(event_loop *loop,
@@ -277,7 +283,8 @@ void process_message(event_loop *loop,
     break;
   case PLASMA_DATA:
     LOG_DEBUG("starting to stream data");
-    start_reading_data(loop, client_sock, req.object_id, req.data_size, req.metadata_size, conn);
+    start_reading_data(loop, client_sock, req.object_id, req.data_size,
+                       req.metadata_size, conn);
     break;
   case DISCONNECT_CLIENT: {
     LOG_INFO("Disconnecting client on fd %d", client_sock);

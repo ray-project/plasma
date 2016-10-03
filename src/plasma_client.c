@@ -92,7 +92,8 @@ void plasma_create(plasma_store_conn *conn,
   CHECK(object->metadata_size == metadata_size);
   /* The metadata should come right after the data. */
   CHECK(object->metadata_offset == object->data_offset + data_size);
-  *data = lookup_or_mmap(conn, fd, object->handle.store_fd, object->handle.mmap_size) +
+  *data = lookup_or_mmap(conn, fd, object->handle.store_fd,
+                         object->handle.mmap_size) +
           object->data_offset;
   /* If plasma_create is being called from a transfer, then we will not copy the
    * metadata here. The metadata will be written along with the data streamed
@@ -115,7 +116,8 @@ void plasma_get(plasma_store_conn *conn,
   plasma_reply reply;
   int fd = recv_fd(conn->conn, (char *) &reply, sizeof(plasma_reply));
   plasma_object *object = &reply.object;
-  *data = lookup_or_mmap(conn, fd, object->handle.store_fd, object->handle.mmap_size) +
+  *data = lookup_or_mmap(conn, fd, object->handle.store_fd,
+                         object->handle.mmap_size) +
           object->data_offset;
   *size = object->data_size;
   /* If requested, return the metadata as well. */
@@ -215,7 +217,8 @@ void plasma_transfer(int manager,
                      const char *addr,
                      int port,
                      object_id object_id) {
-  plasma_request req = {.type = PLASMA_TRANSFER, .object_id = object_id, .port = port};
+  plasma_request req = {
+      .type = PLASMA_TRANSFER, .object_id = object_id, .port = port};
   char *end = NULL;
   for (int i = 0; i < 4; ++i) {
     req.addr[i] = strtol(end ? end : addr, &end, 10);

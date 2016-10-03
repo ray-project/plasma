@@ -39,10 +39,7 @@ typedef struct {
   int64_t metadata_size;
 } plasma_object;
 
-enum object_status {
-  OBJECT_NOT_FOUND = 0,
-  OBJECT_FOUND = 1
-};
+enum object_status { OBJECT_NOT_FOUND = 0, OBJECT_FOUND = 1 };
 
 enum plasma_message_type {
   /** Create a new object. */
