@@ -55,7 +55,7 @@ struct plasma_buffer {
 };
 
 /* Context for a client connection to another plasma manager. */
-struct client_connection_impl {
+struct client_connection {
   /* Current state for this plasma manager. This is shared between all client
    * connections to the plasma manager. */
   plasma_manager_state *manager_state;

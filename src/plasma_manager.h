@@ -4,7 +4,7 @@
 #include <poll.h>
 #include "utarray.h"
 
-typedef struct client_connection_impl client_connection;
+typedef struct client_connection client_connection;
 
 /**
  * Start transfering data to another object store manager.

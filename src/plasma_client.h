@@ -1,7 +1,7 @@
 #ifndef PLASMA_CLIENT_H
 #define PLASMA_CLIENT_H
 
-typedef struct plasma_store_conn_impl plasma_store_conn;
+typedef struct plasma_store_conn plasma_store_conn;
 
 /**
  * This is used by the Plasma Client to send a request to the Plasma Store or

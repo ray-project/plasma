@@ -31,7 +31,7 @@ typedef struct {
 
 /** Information about a connection between a Plasma Client and Plasma Store.
  *  This is used to avoid mapping the same files into memory multiple times. */
-struct plasma_store_conn_impl {
+struct plasma_store_conn {
   /** File descriptor of the Unix domain socket that connects to the store. */
   int conn;
   /** Table of dlmalloc buffer files that have been memory mapped so far. */
