@@ -84,7 +84,7 @@ void *fake_mmap(size_t size) {
 
   /* Increase dlmalloc's allocation granularity directly. */
   mparams.granularity *= GRANULARITY_MULTIPLIER;
-  
+
   struct mmap_record *record = malloc(sizeof(struct mmap_record));
   record->fd = fd;
   record->pointer = pointer;
