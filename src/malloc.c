@@ -12,15 +12,14 @@
 void *fake_mmap(size_t);
 int fake_munmap(void *, size_t);
 
-size_t dlmalloc_granularity = ((size_t) 128U * 1024U);
-
 #define MMAP(s) fake_mmap(s)
 #define MUNMAP(a, s) fake_munmap(a, s)
 #define DIRECT_MMAP(s) fake_mmap(s)
 #define DIRECT_MUNMAP(a, s) fake_munmap(a, s)
 #define USE_DL_PREFIX
 #define HAVE_MORECORE 0
-#define DEFAULT_GRANULARITY (dlmalloc_granularity)
+#define DEFAULT_MMAP_THRESHOLD MAX_SIZE_T
+#define DEFAULT_GRANULARITY ((size_t) 128U * 1024U)
 
 #include "thirdparty/dlmalloc.c"
 
@@ -83,11 +82,9 @@ void *fake_mmap(size_t size) {
     return pointer;
   }
 
-  /* Update dlmalloc's allocation granularity for future calls */
-  dlmalloc_granularity *= GRANULARITY_MULTIPLIER;
-  dlmallopt(M_GRANULARITY, dlmalloc_granularity);
-  dlmallopt(M_MMAP_THRESHOLD, dlmalloc_granularity);
-
+  /* Increase dlmalloc's allocation granularity directly. */
+  mparams.granularity *= GRANULARITY_MULTIPLIER;
+  
   struct mmap_record *record = malloc(sizeof(struct mmap_record));
   record->fd = fd;
   record->pointer = pointer;
