@@ -92,16 +92,6 @@ plasma_store_state *init_plasma_store(event_loop *loop) {
   return state;
 }
 
-void free_plasma_store(plasma_store_state *s) {
-  /* Delete all the objects from the store. */
-  object_table_entry *e, *tmp;
-  HASH_ITER(handle, s->sealed_objects, e, tmp) {
-    delete_object(s, e->object_id);
-  }
-  event_loop_destroy(s->loop);
-  free(s);
-}
-
 /* Create a new object buffer in the hash table. */
 plasma_object create_object(plasma_store_state *s,
                             object_id object_id,
@@ -295,26 +285,20 @@ void new_client_connection(event_loop *loop,
   LOG_DEBUG("new connection with fd %d", new_socket);
 }
 
-/* We need this code so we can clean up when we get a SIGTERM signal. */
-
-plasma_store_state *g_state;
-
+/* Report "success" to valgrind. */
 void signal_handler(int signal) {
   if (signal == SIGTERM) {
-    free_plasma_store(g_state);
     exit(0);
   }
 }
-
-/* End of the cleanup code. */
 
 void start_server(char *socket_name) {
   int socket = bind_ipc_sock(socket_name);
   CHECK(socket >= 0);
   event_loop *loop = event_loop_create();
-  g_state = init_plasma_store(loop);
+  plasma_store_state *state = init_plasma_store(loop);
   event_loop_add_file(loop, socket, EVENT_LOOP_READ, new_client_connection,
-                      g_state);
+                      state);
   event_loop_run(loop);
 }
 

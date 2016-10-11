@@ -192,8 +192,8 @@ class TestPlasmaManager(unittest.TestCase):
     plasma_store_command2 = [plasma_store_executable, "-s", store_name2]
 
     if USE_VALGRIND:
-      self.p2 = subprocess.Popen(["valgrind", "--track-origins=yes", "--leak-check=full"] + plasma_store_command1)
-      self.p3 = subprocess.Popen(["valgrind", "--track-origins=yes", "--leak-check=full"] + plasma_store_command2)
+      self.p2 = subprocess.Popen(["valgrind", "--track-origins=yes", "--error-exitcode=1"] + plasma_store_command1)
+      self.p3 = subprocess.Popen(["valgrind", "--track-origins=yes", "--error-exitcode=1"] + plasma_store_command2)
     else:
       self.p2 = subprocess.Popen(plasma_store_command1)
       self.p3 = subprocess.Popen(plasma_store_command2)
@@ -206,8 +206,8 @@ class TestPlasmaManager(unittest.TestCase):
     plasma_manager_command2 = [plasma_manager_executable, "-s", store_name2, "-m", "127.0.0.1", "-p", str(self.port2)]
 
     if USE_VALGRIND:
-      self.p4 = subprocess.Popen(["valgrind", "--track-origins=yes", "--leak-check=full"] + plasma_manager_command1)
-      self.p5 = subprocess.Popen(["valgrind", "--track-origins=yes", "--leak-check=full"] + plasma_manager_command2)
+      self.p4 = subprocess.Popen(["valgrind", "--track-origins=yes", "--error-exitcode=1"] + plasma_manager_command1)
+      self.p5 = subprocess.Popen(["valgrind", "--track-origins=yes", "--error-exitcode=1"] + plasma_manager_command2)
       time.sleep(2.0)
     else:
       self.p4 = subprocess.Popen(plasma_manager_command1)
@@ -222,15 +222,16 @@ class TestPlasmaManager(unittest.TestCase):
   def tearDown(self):
     # Kill the PlasmaStore and PlasmaManager processes.
     if USE_VALGRIND:
-      self.p2.send_signal(signal.SIGTERM)
-      self.p2.wait()
-      self.p3.send_signal(signal.SIGTERM)
-      self.p3.wait()
       self.p4.send_signal(signal.SIGTERM)
       self.p4.wait()
       self.p5.send_signal(signal.SIGTERM)
       self.p5.wait()
+      self.p2.send_signal(signal.SIGTERM)
+      self.p2.wait()
+      self.p3.send_signal(signal.SIGTERM)
+      self.p3.wait()
       if self.p2.returncode != 0 or self.p3.returncode != 0 or self.p4.returncode != 0 or self.p5.returncode != 0:
+        print("aborting due to valgrind error")
         os._exit(-1)
     else:
       self.p2.kill()
