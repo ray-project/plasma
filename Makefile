@@ -21,7 +21,7 @@ $(BUILD)/plasma_manager: src/plasma_manager.c src/plasma.h src/plasma_client.c s
 $(BUILD)/plasma_client.so: src/plasma_client.c src/fling.h src/fling.c common
 	$(CC) $(CFLAGS) src/plasma_client.c src/fling.c common/build/libcommon.a -fPIC -shared -o $(BUILD)/plasma_client.so
 
-$(BUILD)/libplasma_client.a: src/plasma_client.o
+$(BUILD)/libplasma_client.a: src/plasma_client.o src/fling.o
 	ar rcs $@ $^
 
 $(BUILD)/example: src/plasma_client.c src/plasma.h src/example.c src/fling.h src/fling.c common

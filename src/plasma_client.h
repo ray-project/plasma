@@ -1,6 +1,8 @@
 #ifndef PLASMA_CLIENT_H
 #define PLASMA_CLIENT_H
 
+#include "plasma.h"
+
 typedef struct plasma_store_conn plasma_store_conn;
 
 /**
