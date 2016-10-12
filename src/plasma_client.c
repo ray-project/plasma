@@ -115,6 +115,7 @@ void plasma_get(plasma_store_conn *conn,
   plasma_send_request(conn->conn, PLASMA_GET, &req);
   plasma_reply reply;
   int fd = recv_fd(conn->conn, (char *) &reply, sizeof(plasma_reply));
+  CHECKM(fd != -1, "recv not successful");
   plasma_object *object = &reply.object;
   *data = lookup_or_mmap(conn, fd, object->handle.store_fd,
                          object->handle.mmap_size) +
@@ -148,6 +149,12 @@ void plasma_seal(plasma_store_conn *conn, object_id object_id) {
 void plasma_delete(plasma_store_conn *conn, object_id object_id) {
   plasma_request req = {.object_id = object_id};
   plasma_send_request(conn->conn, PLASMA_DELETE, &req);
+}
+
+void plasma_subscribe(plasma_store_conn *conn) {
+  plasma_request req = {};
+  plasma_send_request(conn->conn, PLASMA_SUBSCRIBE, &req);
+  socketpair();
 }
 
 plasma_store_conn *plasma_store_connect(const char *socket_name) {

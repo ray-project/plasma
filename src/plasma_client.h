@@ -1,6 +1,8 @@
 #ifndef PLASMA_CLIENT_H
 #define PLASMA_CLIENT_H
 
+#include "plasma.h"
+
 typedef struct plasma_store_conn plasma_store_conn;
 
 /**
@@ -123,5 +125,15 @@ void plasma_seal(plasma_store_conn *conn, object_id object_id);
  * @return Void.
  */
 void plasma_delete(plasma_store_conn *conn, object_id object_id);
+
+/**
+ * Subscribe to notifications when objects are sealed in the object store.
+ * Whenever an object is sealed, a message will be written to the client socket
+ * inside of the connection object.
+ *
+ * @param conn The object containing the connection state.
+ * @return Void.
+ */
+void plasma_subscribe(plasma_store_conn *conn);
 
 #endif
