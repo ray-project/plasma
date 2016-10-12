@@ -151,6 +151,12 @@ void plasma_delete(plasma_store_conn *conn, object_id object_id) {
   plasma_send_request(conn->conn, PLASMA_DELETE, &req);
 }
 
+void plasma_subscribe(plasma_store_conn *conn) {
+  plasma_request req = {};
+  plasma_send_request(conn->conn, PLASMA_SUBSCRIBE, &req);
+  socketpair();
+}
+
 plasma_store_conn *plasma_store_connect(const char *socket_name) {
   assert(socket_name);
   /* Try to connect to the Plasma store. If unsuccessful, retry several times.

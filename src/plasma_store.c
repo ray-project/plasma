@@ -92,6 +92,9 @@ plasma_store_state *init_plasma_store(event_loop *loop) {
   return state;
 }
 
+/* Sockets that have subscribed to notifications about sealed objects. */
+UT_array *subscribers;
+
 /* Create a new object buffer in the hash table. */
 plasma_object create_object(plasma_store_state *s,
                             object_id object_id,
@@ -216,6 +219,13 @@ void delete_object(plasma_store_state *s, object_id object_id) {
   free(entry);
 }
 
+/* Subscribe to notifications about sealed objects. */
+void subscribe_to_updates(int conn) {
+  LOG_DEBUG("subscribing to updates");
+
+}
+
+
 void process_message(event_loop *loop,
                      int client_sock,
                      void *context,
@@ -263,6 +273,9 @@ void process_message(event_loop *loop,
   case PLASMA_DELETE:
     delete_object(s, req->object_id);
     break;
+  case PLASMA_SUBSCRIBE:
+    subscribe_to_updates(client_sock);
+    break;
   case DISCONNECT_CLIENT: {
     LOG_DEBUG("Disconnecting client on fd %d", client_sock);
     event_loop_remove_file(loop, client_sock);
@@ -295,6 +308,12 @@ void signal_handler(int signal) {
 void start_server(char *socket_name) {
   int socket = bind_ipc_sock(socket_name);
   CHECK(socket >= 0);
+
+  /* Create an array to store the sockets of clients that subscribe to
+  /* notifications about object seals. */
+  utarray_new(subscribers, &ut_int_icd);
+
+
   event_loop *loop = event_loop_create();
   plasma_store_state *state = init_plasma_store(loop);
   event_loop_add_file(loop, socket, EVENT_LOOP_READ, new_client_connection,
