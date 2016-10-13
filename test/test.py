@@ -3,6 +3,7 @@ from __future__ import print_function
 import os
 import signal
 import socket
+import struct
 import subprocess
 import sys
 import unittest
@@ -180,6 +181,23 @@ class TestPlasmaClient(unittest.TestCase):
     def illegal_assignment():
       memory_buffer[0] = chr(0)
     self.assertRaises(Exception, illegal_assignment)
+
+  def test_subscribe(self):
+    # Subscribe to notifications from the Plasma Store.
+    socket = self.plasma_client.subscribe()
+    for i in range(50):
+      object_ids = [random_object_id() for _ in range(i)]
+      for object_id in object_ids:
+        # Create an object and seal it to trigger a notification.
+        self.plasma_client.create(object_id, 1000)
+        self.plasma_client.seal(object_id)
+      for object_id in object_ids:
+        # Check that we received notifications for all of the objects.
+        type_data = socket.recv(8)
+        length_data = socket.recv(8)
+        message_data = socket.recv(20)
+        self.assertEqual(struct.unpack("q", length_data)[0], 20)
+        self.assertEqual(object_id, message_data)
 
 class TestPlasmaManager(unittest.TestCase):
 

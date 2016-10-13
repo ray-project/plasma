@@ -46,6 +46,7 @@ class PlasmaClient(object):
     self.client.plasma_contains.restype = None
     self.client.plasma_seal.restype = None
     self.client.plasma_delete.restype = None
+    self.client.plasma_subscribe.restype = ctypes.c_int
 
     self.buffer_from_memory = ctypes.pythonapi.PyBuffer_FromMemory
     self.buffer_from_memory.argtypes = [ctypes.c_void_p, ctypes.c_int64]
@@ -161,3 +162,8 @@ class PlasmaClient(object):
     if self.manager_conn == -1:
       raise Exception("Not connected to the plasma manager socket")
     self.client.plasma_transfer(self.manager_conn, addr, port, make_plasma_id(object_id))
+
+  def subscribe(self):
+    """Subscribe to notifications about sealed objects."""
+    fd = self.client.plasma_subscribe(self.store_conn)
+    return socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
