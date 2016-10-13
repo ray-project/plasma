@@ -151,6 +151,19 @@ void plasma_delete(plasma_store_conn *conn, object_id object_id) {
   plasma_send_request(conn->conn, PLASMA_DELETE, &req);
 }
 
+int plasma_subscribe(plasma_store_conn *conn) {
+  int fd[2];
+  socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
+  plasma_request req = {};
+  plasma_send_request(conn->conn, PLASMA_SUBSCRIBE, &req);
+  /* Send the file descriptor that the Plasma store should use to push
+   * notifications about sealed objects to this client. */
+  send_fd(conn->conn, fd[1], NULL, 0);
+  /* Return the file descriptor that the client should use to read notifications
+   * about sealed objects. */
+  return fd[0];
+}
+
 plasma_store_conn *plasma_store_connect(const char *socket_name) {
   assert(socket_name);
   /* Try to connect to the Plasma store. If unsuccessful, retry several times.

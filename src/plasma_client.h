@@ -126,4 +126,15 @@ void plasma_seal(plasma_store_conn *conn, object_id object_id);
  */
 void plasma_delete(plasma_store_conn *conn, object_id object_id);
 
+/**
+ * Subscribe to notifications when objects are sealed in the object store.
+ * Whenever an object is sealed, a message will be written to the client socket
+ * inside of the connection object.
+ *
+ * @param conn The object containing the connection state.
+ * @return The file descriptor that the client should use to read notifications
+           from the object store about sealed objects.
+ */
+int plasma_subscribe(plasma_store_conn *conn);
+
 #endif

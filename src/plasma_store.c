@@ -81,6 +81,9 @@ struct plasma_store_state {
   object_table_entry *sealed_objects;
   /* Objects that processes are waiting for. */
   object_notify_entry *objects_notify;
+  /* Client file descriptors that have subscribed to notifications about object
+   * seal events. */
+  UT_array *subscribers;
 };
 
 plasma_store_state *init_plasma_store(event_loop *loop) {
@@ -89,6 +92,7 @@ plasma_store_state *init_plasma_store(event_loop *loop) {
   state->open_objects = NULL;
   state->sealed_objects = NULL;
   state->objects_notify = NULL;
+  utarray_new(state->subscribers, &ut_int_icd);
   return state;
 }
 
@@ -182,7 +186,14 @@ void seal_object(plasma_store_state *s,
   }
   HASH_DELETE(handle, s->open_objects, entry);
   HASH_ADD(handle, s->sealed_objects, object_id, sizeof(object_id), entry);
-  /* Inform processes that the object is ready now. */
+
+  /* Inform all subscribers that a new object has been sealed. */
+  for (int *p = (int *) utarray_front(s->subscribers); p != NULL;
+       p = (int *) utarray_next(s->subscribers, p)) {
+    write_message(*p, PLASMA_OBJECT_SEALED, sizeof(object_id), &object_id);
+  }
+
+  /* Inform processes getting this object that the object is ready now. */
   object_notify_entry *notify_entry;
   HASH_FIND(handle, s->objects_notify, &object_id, sizeof(object_id),
             notify_entry);
@@ -214,6 +225,17 @@ void delete_object(plasma_store_state *s, object_id object_id) {
   HASH_DELETE(handle, s->sealed_objects, entry);
   dlfree(pointer);
   free(entry);
+}
+
+/* Subscribe to notifications about sealed objects. */
+void subscribe_to_updates(plasma_store_state *s, int conn) {
+  LOG_DEBUG("subscribing to updates");
+  int fd = recv_fd(conn, NULL, 0);
+  utarray_push_back(s->subscribers, &fd);
+  CHECKM(HASH_CNT(handle, s->open_objects) == 0,
+         "plasma_subscribe should be called before any objects are created.");
+  CHECKM(HASH_CNT(handle, s->sealed_objects) == 0,
+         "plasma_subscribe should be called before any objects are created.");
 }
 
 void process_message(event_loop *loop,
@@ -262,6 +284,9 @@ void process_message(event_loop *loop,
     break;
   case PLASMA_DELETE:
     delete_object(s, req->object_id);
+    break;
+  case PLASMA_SUBSCRIBE:
+    subscribe_to_updates(s, client_sock);
     break;
   case DISCONNECT_CLIENT: {
     LOG_DEBUG("Disconnecting client on fd %d", client_sock);
