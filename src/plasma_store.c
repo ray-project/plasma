@@ -279,7 +279,7 @@ void start_server(char *socket_name) {
 }
 
 int is_power_of_two(size_t x) {
-   return !(x == 0) && !(x & (x - 1));
+  return !(x == 0) && !(x & (x - 1));
 }
 
 int main(int argc, char *argv[]) {
@@ -299,7 +299,8 @@ int main(int argc, char *argv[]) {
     exit(-1);
   }
   /* Check that dlmalloc granularity is a power of 2 */
-  CHECKM(is_power_of_two(DEFAULT_GRANULARITY), "Default granularity should be a power of 2.");
+  CHECKM(is_power_of_two(DEFAULT_GRANULARITY), 
+          "Default granularity should be a power of 2.");
   LOG_DEBUG("starting server listening on %s", socket_name);
   start_server(socket_name);
 }
