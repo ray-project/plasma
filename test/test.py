@@ -184,19 +184,25 @@ class TestPlasmaClient(unittest.TestCase):
 
   def test_subscribe(self):
     # Subscribe to notifications from the Plasma Store.
-    socket = self.plasma_client.subscribe()
-    for i in range(50):
+    sock = self.plasma_client.subscribe()
+    for i in [1, 10, 100, 1000, 10000]:
       object_ids = [random_object_id() for _ in range(i)]
       for object_id in object_ids:
         # Create an object and seal it to trigger a notification.
         self.plasma_client.create(object_id, 1000)
         self.plasma_client.seal(object_id)
+      # Check that we received notifications for all of the objects.
       for object_id in object_ids:
-        # Check that we received notifications for all of the objects.
-        type_data = socket.recv(8)
-        length_data = socket.recv(8)
-        message_data = socket.recv(20)
-        self.assertEqual(struct.unpack("q", length_data)[0], 20)
+        # Loop until we've received the correct number of bytes over the
+        # non-blocking socket.
+        while True:
+          try:
+            message_data = sock.recv(20)
+          except socket.error:
+            time.sleep(0.001)
+          else:
+            self.assertEqual(len(message_data), 20)
+            break
         self.assertEqual(object_id, message_data)
 
 class TestPlasmaManager(unittest.TestCase):

@@ -1,6 +1,7 @@
 /* PLASMA CLIENT: Client library for using the plasma store and manager */
 
 #include <assert.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -153,7 +154,18 @@ void plasma_delete(plasma_store_conn *conn, object_id object_id) {
 
 int plasma_subscribe(plasma_store_conn *conn) {
   int fd[2];
+  /* Create a non-blocking socket pair. This will only be used to send
+   * notifications from the Plasma store to the client. */
   socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
+  /* Make the socket non-blocking. */
+  int flags = fcntl(fd[1], F_GETFL, 0);
+  if (fcntl(fd[1], F_SETFL, flags | O_NONBLOCK) < 0) {
+    LOG_ERR("fcntl failed");
+    close(fd[0]);
+    close(fd[1]);
+    exit(-1);
+  }
+  /* Tell the Plasma store about the subscription. */
   plasma_request req = {};
   plasma_send_request(conn->conn, PLASMA_SUBSCRIBE, &req);
   /* Send the file descriptor that the Plasma store should use to push

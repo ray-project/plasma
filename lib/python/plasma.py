@@ -166,4 +166,7 @@ class PlasmaClient(object):
   def subscribe(self):
     """Subscribe to notifications about sealed objects."""
     fd = self.client.plasma_subscribe(self.store_conn)
-    return socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
+    sock = socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
+    # Make the socket non-blocking.
+    sock.setblocking(0)
+    return sock
