@@ -226,8 +226,9 @@ void seal_object(plasma_store_state *s,
       } else if (nbytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
         /* In this case, the socket's send buffer was full, so queue the
          * notification. It will be sent later when there is space. */
-        LOG_DEBUG("The socket's send buffer is full, so we are caching this "
-                  "notification and will send it later.");
+        LOG_DEBUG(
+            "The socket's send buffer is full, so we are caching this "
+            "notification and will send it later.");
         utarray_push_back(queue->object_ids, &object_id);
       } else {
         CHECKM(0, "This code should be unreachable.");
@@ -280,7 +281,6 @@ void send_notifications(event_loop *loop,
   HASH_FIND_INT(s->pending_notifications, &client_sock, queue);
   CHECK(queue != NULL);
 
-
   int num_processed = 0;
   /* Loop over the array of pending notifications and send as many of them as
    * possible. */
@@ -292,8 +292,9 @@ void send_notifications(event_loop *loop,
     if (nbytes >= 0) {
       CHECK(nbytes == sizeof(object_id));
     } else if (nbytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-      LOG_DEBUG("The socket's send buffer is full, so we are caching this "
-                "notification and will send it later.");
+      LOG_DEBUG(
+          "The socket's send buffer is full, so we are caching this "
+          "notification and will send it later.");
       break;
     } else {
       CHECKM(0, "This code should be unreachable.");
@@ -316,7 +317,7 @@ void subscribe_to_updates(plasma_store_state *s, int conn) {
   /* Create a new array to buffer notifications that can't be sent to the
    * subscriber yet because the socket send buffer is full. TODO(rkn): the queue
    * never gets freed. */
-  notification_queue* queue =
+  notification_queue *queue =
       (notification_queue *) malloc(sizeof(notification_queue));
   queue->subscriber_fd = fd;
   utarray_new(queue->object_ids, &object_id_icd);
