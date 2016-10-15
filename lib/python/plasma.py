@@ -1,17 +1,19 @@
 import os
 import socket
 import ctypes
+import time
 
 Addr = ctypes.c_ubyte * 4
 
-ID = ctypes.c_ubyte * 20
+PLASMA_ID_SIZE = 20
+ID = ctypes.c_ubyte * PLASMA_ID_SIZE
 
 class PlasmaID(ctypes.Structure):
   _fields_ = [("plasma_id", ID)]
 
 def make_plasma_id(string):
-  if len(string) != 20:
-    raise Exception("PlasmaIDs must be 20 characters long")
+  if len(string) != PLASMA_ID_SIZE:
+    raise Exception("PlasmaIDs must be {} characters long".format(PLASMA_ID_SIZE))
   object_id = map(ord, string)
   return PlasmaID(plasma_id=ID(*object_id))
 
@@ -166,7 +168,21 @@ class PlasmaClient(object):
   def subscribe(self):
     """Subscribe to notifications about sealed objects."""
     fd = self.client.plasma_subscribe(self.store_conn)
-    sock = socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
+    self.notification_sock = socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
     # Make the socket non-blocking.
-    sock.setblocking(0)
-    return sock
+    self.notification_sock.setblocking(0)
+
+  def get_next_notification(self):
+    """Get the next notification from the notification socket."""
+    if not self.notification_sock:
+      raise Exception("To get notifications, first call subscribe.")
+    # Loop until we've read PLASMA_ID_SIZE bytes from the socket.
+    while True:
+      try:
+        message_data = self.notification_sock.recv(PLASMA_ID_SIZE)
+      except socket.error:
+        time.sleep(0.001)
+      else:
+        assert len(message_data) == PLASMA_ID_SIZE
+        break
+    return message_data

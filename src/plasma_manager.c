@@ -321,11 +321,7 @@ void start_server(const char *store_socket_name,
   name.sin_addr.s_addr = htonl(INADDR_ANY);
   /* Make the socket non-blocking. */
   int flags = fcntl(sock, F_GETFL, 0);
-  if (fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
-    LOG_ERR("fcntl failed");
-    close(sock);
-    exit(-1);
-  }
+  CHECK(fcntl(sock, F_SETFL, flags | O_NONBLOCK) == 0);
   int on = 1;
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   if (bind(sock, (struct sockaddr *) &name, sizeof(name)) < 0) {

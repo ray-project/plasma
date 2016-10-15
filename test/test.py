@@ -16,7 +16,7 @@ import plasma
 USE_VALGRIND = False
 
 def random_object_id():
-  return "".join([chr(random.randint(0, 255)) for _ in range(20)])
+  return "".join([chr(random.randint(0, 255)) for _ in range(plasma.PLASMA_ID_SIZE)])
 
 def generate_metadata(length):
   metadata = length * ["\x00"]
@@ -185,7 +185,7 @@ class TestPlasmaClient(unittest.TestCase):
   def test_subscribe(self):
     # Subscribe to notifications from the Plasma Store.
     sock = self.plasma_client.subscribe()
-    for i in [1, 10, 100, 1000, 10000]:
+    for i in [1, 10, 100, 1000, 10000, 100000]:
       object_ids = [random_object_id() for _ in range(i)]
       for object_id in object_ids:
         # Create an object and seal it to trigger a notification.
@@ -193,16 +193,7 @@ class TestPlasmaClient(unittest.TestCase):
         self.plasma_client.seal(object_id)
       # Check that we received notifications for all of the objects.
       for object_id in object_ids:
-        # Loop until we've received the correct number of bytes over the
-        # non-blocking socket.
-        while True:
-          try:
-            message_data = sock.recv(20)
-          except socket.error:
-            time.sleep(0.001)
-          else:
-            self.assertEqual(len(message_data), 20)
-            break
+        message_data = self.plasma_client.get_next_notification()
         self.assertEqual(object_id, message_data)
 
 class TestPlasmaManager(unittest.TestCase):

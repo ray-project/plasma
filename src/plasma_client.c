@@ -159,12 +159,7 @@ int plasma_subscribe(plasma_store_conn *conn) {
   socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
   /* Make the socket non-blocking. */
   int flags = fcntl(fd[1], F_GETFL, 0);
-  if (fcntl(fd[1], F_SETFL, flags | O_NONBLOCK) < 0) {
-    LOG_ERR("fcntl failed");
-    close(fd[0]);
-    close(fd[1]);
-    exit(-1);
-  }
+  CHECK(fcntl(fd[1], F_SETFL, flags | O_NONBLOCK) == 0);
   /* Tell the Plasma store about the subscription. */
   plasma_request req = {};
   plasma_send_request(conn->conn, PLASMA_SUBSCRIBE, &req);

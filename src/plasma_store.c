@@ -96,9 +96,6 @@ struct plasma_store_state {
   object_table_entry *sealed_objects;
   /* Objects that processes are waiting for. */
   object_notify_entry *objects_notify;
-  /** Client file descriptors that have subscribed to notifications about object
-   *  seal events. */
-  UT_array *subscribers;
   /** The pending notifications that have not been sent to subscribers because
    *  the socket send buffers were full. This is a hash table from client file
    *  descriptor to an array of object_ids to send to that client. */
@@ -111,7 +108,6 @@ plasma_store_state *init_plasma_store(event_loop *loop) {
   state->open_objects = NULL;
   state->sealed_objects = NULL;
   state->objects_notify = NULL;
-  utarray_new(state->subscribers, &ut_int_icd);
   state->pending_notifications = NULL;
   return state;
 }
@@ -208,32 +204,10 @@ void seal_object(plasma_store_state *s,
   HASH_ADD(handle, s->sealed_objects, object_id, sizeof(object_id), entry);
 
   /* Inform all subscribers that a new object has been sealed. */
-  for (int *fd = (int *) utarray_front(s->subscribers); fd != NULL;
-       fd = (int *) utarray_next(s->subscribers, fd)) {
-    /* Get the queue of pending notifications for this subscriber. */
-    notification_queue *queue;
-    HASH_FIND_INT(s->pending_notifications, fd, queue);
-    CHECK(queue != NULL);
-    if (utarray_len(queue->object_ids) > 0) {
-      /* There are pending notifications, so add this notification to the queue.
-       * It will be processed later when there is space. */
-      utarray_push_back(queue->object_ids, &object_id);
-    } else {
-      /* Attempt to send a notification to the client. */
-      int nbytes = send(*fd, &object_id, sizeof(object_id), 0);
-      if (nbytes >= 0) {
-        CHECK(nbytes == sizeof(object_id));
-      } else if (nbytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-        /* In this case, the socket's send buffer was full, so queue the
-         * notification. It will be sent later when there is space. */
-        LOG_DEBUG(
-            "The socket's send buffer is full, so we are caching this "
-            "notification and will send it later.");
-        utarray_push_back(queue->object_ids, &object_id);
-      } else {
-        CHECKM(0, "This code should be unreachable.");
-      }
-    }
+  notification_queue *queue, *temp_queue;
+  HASH_ITER(hh, s->pending_notifications, queue, temp_queue) {
+    utarray_push_back(queue->object_ids, &object_id);
+    send_notifications(s->loop, queue->subscriber_fd, s, 0);
   }
 
   /* Inform processes getting this object that the object is ready now. */
@@ -309,7 +283,6 @@ void send_notifications(event_loop *loop,
 void subscribe_to_updates(plasma_store_state *s, int conn) {
   LOG_DEBUG("subscribing to updates");
   int fd = recv_fd(conn, NULL, 0);
-  utarray_push_back(s->subscribers, &fd);
   CHECKM(HASH_CNT(handle, s->open_objects) == 0,
          "plasma_subscribe should be called before any objects are created.");
   CHECKM(HASH_CNT(handle, s->sealed_objects) == 0,
