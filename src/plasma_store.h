@@ -77,7 +77,9 @@ void delete_object(plasma_store_state *s, object_id object_id);
           callback.
  * @return Void.
  */
-void send_notifications(event_loop *loop, int client_sock, void *context,
+void send_notifications(event_loop *loop,
+                        int client_sock,
+                        void *context,
                         int events);
 
 #endif /* PLASMA_STORE_H */
