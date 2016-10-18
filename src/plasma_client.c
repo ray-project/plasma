@@ -48,7 +48,9 @@ int plasma_request_size(int num_object_ids) {
 
 void plasma_send_request(int fd, int type, plasma_request *req) {
   int req_size = plasma_request_size(req->num_object_ids);
-  write_message(fd, type, req_size, (uint8_t *) req);
+  int error = write_message(fd, type, req_size, (uint8_t *) req);
+  /* TODO(swang): Actually handle the write error. */
+  CHECK(!error);
 }
 
 plasma_request make_plasma_request(object_id object_id) {
@@ -241,6 +243,7 @@ void plasma_disconnect(plasma_connection *conn) {
 
 #define h_addr h_addr_list[0]
 
+/* TODO(swang): Return the error to the caller. */
 int plasma_manager_connect(const char *ip_addr, int port) {
   int fd = socket(PF_INET, SOCK_STREAM, 0);
   if (fd < 0) {

@@ -271,7 +271,8 @@ plasma_manager_state *init_plasma_manager_state(const char *store_socket_name,
     state->db = db_connect(db_addr, db_port, "plasma_manager", manager_addr,
                            manager_port);
     db_attach(state->db, state->loop);
-    LOG_DEBUG("Connected to db at %s:%d", db_addr, db_port);
+    LOG_DEBUG("Connected to db at %s:%d, assigned client ID %d", db_addr,
+              db_port, get_client_id(state->db));
   } else {
     state->db = NULL;
     LOG_DEBUG("No db connection specified");
@@ -331,7 +332,8 @@ void send_queued_request(event_loop *loop,
   plasma_request manager_req = make_plasma_request(buf->object_id);
   switch (buf->type) {
   case PLASMA_TRANSFER:
-    LOG_DEBUG("Requesting transfer");
+    LOG_DEBUG("Requesting transfer on DB client %d",
+              get_client_id(conn->manager_state->db));
     memcpy(manager_req.addr, conn->manager_state->addr,
            sizeof(manager_req.addr));
     manager_req.port = conn->manager_state->port;
@@ -428,7 +430,8 @@ client_connection *get_manager_connection(plasma_manager_state *state,
   client_connection *manager_conn;
   HASH_FIND_STR(state->manager_connections, utstring_body(ip_addr_port),
                 manager_conn);
-  LOG_DEBUG("Getting manager connection to %s", utstring_body(ip_addr_port));
+  LOG_DEBUG("Getting manager connection to %s on DB client %d",
+            utstring_body(ip_addr_port), get_client_id(state->db));
   if (!manager_conn) {
     /* If we don't already have a connection to this manager, start one. */
     manager_conn = malloc(sizeof(client_connection));
@@ -454,6 +457,8 @@ void process_transfer_request(event_loop *loop,
   int64_t data_size;
   uint8_t *metadata;
   int64_t metadata_size;
+  /* TODO(swang): A non-blocking plasma_get, or else we could block here
+   * forever if we don't end up sealing this object. */
   plasma_get(conn->manager_state->plasma_conn, object_id, &data_size, &data,
              &metadata_size, &metadata);
   assert(metadata == data + data_size);
@@ -673,7 +678,8 @@ void process_message(event_loop *loop,
     process_fetch_requests(conn, req->num_object_ids, req->object_ids);
     break;
   case PLASMA_SEAL:
-    LOG_DEBUG("Publishing object to object table.");
+    LOG_DEBUG("Publishing to object table from DB client %d.",
+              get_client_id(conn->manager_state->db));
     object_table_add(conn->manager_state->db, req->object_ids[0]);
     break;
   case DISCONNECT_CLIENT: {
@@ -719,7 +725,8 @@ void start_server(const char *store_socket_name,
   g_manager_state = init_plasma_manager_state(store_socket_name, master_addr,
                                               port, db_addr, db_port);
   CHECK(g_manager_state);
-  LOG_DEBUG("Started server");
+  LOG_DEBUG("Started server connected to store %s, listening on port %d",
+            store_socket_name, port);
   event_loop_add_file(g_manager_state->loop, sock, EVENT_LOOP_READ,
                       new_client_connection, g_manager_state);
   event_loop_run(g_manager_state->loop);
