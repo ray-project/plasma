@@ -547,7 +547,7 @@ void request_transfer_from(client_connection *client_conn,
   LL_APPEND(manager_conn->transfer_queue, transfer_request);
 }
 
-int64_t manager_timeout_handler(event_loop *loop, int64_t id, void *context) {
+int manager_timeout_handler(event_loop *loop, timer_id id, void *context) {
   client_object_connection *object_conn = context;
   client_connection *client_conn = object_conn->client_conn;
   LOG_DEBUG("Timer went off, %d tries left", object_conn->num_retries);
