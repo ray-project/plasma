@@ -26,9 +26,28 @@ typedef struct {
   int key;
   /** The result of mmap for this file descriptor. */
   uint8_t *pointer;
+  /** The length of the memory-mapped file. */
+  size_t length;
+  /** The number of objects in this memory-mapped file that are currently being
+   *  used by the client. When this count reaches zeros, we unmap the file. */
+  int count;
   /** Handle for the uthash table. */
   UT_hash_handle hh;
 } client_mmap_table_entry;
+
+typedef struct {
+  /** The ID of the object. This is used as the key in the hash table. */
+  object_id object_id;
+  /** The file descriptor of the memory-mapped file that contains the object. */
+  int fd;
+  /** A count of the number of times this client has called get_object on this
+   *  object ID without calling the corresponding release. When this count
+   *  reaches zero, we remove the entry from the object_id_table and decrement
+   *  a count in the relevant client_mmap_table_entry. */
+  int count;
+  /** Handle for the uthash table. */
+  UT_hash_handle hh;
+} object_id_mmapped_file_entry;
 
 /** Information about a connection between a Plasma Client and Plasma Store.
  *  This is used to avoid mapping the same files into memory multiple times. */
@@ -37,8 +56,13 @@ struct plasma_connection {
   int store_conn;
   /** File descriptor of the Unix domain socket that connects to the manager. */
   int manager_conn;
-  /** Table of dlmalloc buffer files that have been memory mapped so far. */
+  /** Table of dlmalloc buffer files that have been memory mapped so far. This
+   *  is a hash table mapping a file descriptor to a struct containing the
+   *  address of the corresponding memory-mapped file. */
   client_mmap_table_entry *mmap_table;
+  /** A hash table mapping an object ID to the file descriptor of the memory
+   *  mapped file that contains that object ID. */
+  object_id_mmapped_file_entry *object_id_table;
 };
 
 int plasma_request_size(int num_object_ids) {
@@ -90,6 +114,8 @@ uint8_t *lookup_or_mmap(plasma_connection *conn,
     entry = malloc(sizeof(client_mmap_table_entry));
     entry->key = store_fd_val;
     entry->pointer = result;
+    entry->length = map_size;
+    entry->count = 0;
     HASH_ADD_INT(conn->mmap_table, key, entry);
     return result;
   }
@@ -149,6 +175,71 @@ void plasma_get(plasma_connection *conn,
   if (metadata != NULL) {
     *metadata = *data + object->data_size;
     *metadata_size = object->metadata_size;
+  }
+
+  /* Increment the count of the object to track the fact that it is being used.
+   * The corresponding decrement should happen in plasma_release. */
+  object_id_mmapped_file_entry *object_entry;
+  HASH_FIND(hh, conn->object_id_table, &object_id, sizeof(object_id),
+            object_entry);
+  if (object_entry == NULL) {
+    /* Add this object ID to the hash table of object IDs in use. */
+    object_entry = malloc(sizeof(object_id_mmapped_file_entry));
+    object_entry->object_id = object_id;
+    object_entry->fd = object->handle.store_fd;
+    object_entry->count = 0;
+    HASH_ADD(hh, conn->object_id_table, object_id, sizeof(object_id),
+             object_entry);
+    /* Increment the count of the number of objects in the memory-mapped file
+     * that are being used. The corresponding decrement should happen in
+     * plasma_release. */
+    client_mmap_table_entry *entry;
+    HASH_FIND_INT(conn->mmap_table, &object_entry->fd, entry);
+    CHECK(entry != NULL);
+    CHECK(entry->count >= 0);
+    entry->count += 1;
+  } else {
+    CHECK(object_entry->count > 0);
+  }
+  /* Increment the count of the number of instances of this object that are
+   * being used by this client. The corresponding decrement should happen in
+   * plasma_release. */
+  object_entry->count += 1;
+}
+
+void plasma_release(plasma_connection *conn, object_id object_id) {
+  /* Decrement the count of the number of instances of this object that are
+   * being used by this client. The corresponding increment should have happened
+   * in plasma_get. */
+  object_id_mmapped_file_entry *object_entry;
+  HASH_FIND(hh, conn->object_id_table, &object_id, sizeof(object_id),
+            object_entry);
+  CHECK(object_entry != NULL);
+  object_entry->count -= 1;
+  CHECK(object_entry->count >= 0);
+  /* Check if the client is no longer using this object. */
+  if (object_entry->count == 0) {
+    /* Decrement the count of the number of objects in this memory-mapped file
+     * that the client is using. The corresponding increment should have
+     * happened in plasma_get. */
+    client_mmap_table_entry *entry;
+    HASH_FIND_INT(conn->mmap_table, &object_entry->fd, entry);
+    CHECK(entry != NULL);
+    entry->count -= 1;
+    CHECK(entry->count >= 0);
+    /* If none are being used then unmap the file. */
+    if (entry->count == 0) {
+      munmap(entry->pointer, entry->length);
+      /* Remove the corresponding entry from the hash table. */
+      HASH_DELETE(hh, conn->mmap_table, entry);
+      free(entry);
+    }
+    /* Tell the store that the client no longer needs the object. */
+    plasma_request req = make_plasma_request(object_id);
+    plasma_send_request(conn->store_conn, PLASMA_RELEASE, &req);
+    /* Remove the entry from the hash table of objects currently in use. */
+    HASH_DELETE(hh, conn->object_id_table, object_entry);
+    free(object_entry);
   }
 }
 
@@ -230,6 +321,7 @@ plasma_connection *plasma_connect(const char *store_socket_name,
     result->manager_conn = -1;
   }
   result->mmap_table = NULL;
+  result->object_id_table = NULL;
   return result;
 }
 
