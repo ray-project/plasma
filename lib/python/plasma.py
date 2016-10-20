@@ -118,7 +118,7 @@ class PlasmaClient(object):
     metadata = buffer("") if metadata is None else metadata
     metadata = (ctypes.c_ubyte * len(metadata)).from_buffer_copy(metadata)
     self.client.plasma_create(self.plasma_conn, make_plasma_id(object_id), size, ctypes.cast(metadata, ctypes.POINTER(ctypes.c_ubyte * len(metadata))), len(metadata), ctypes.byref(data))
-    return self.buffer_from_read_write_memory(data, size)
+    return PlasmaBuffer(self.buffer_from_read_write_memory(data, size), make_plasma_id(object_id), self)
 
   def get(self, object_id):
     """Create a buffer from the PlasmaStore based on object ID.

@@ -9,12 +9,14 @@ typedef struct plasma_store_state plasma_store_state;
  * Create a new object:
  *
  * @param plasma_state The plasma store state.
+ * @param client_index The index of the client making this request.
  * @param object_id Object ID of the object to be created.
  * @param data_size Size in bytes of the object to be created.
  * @param metadata_size Size in bytes of the object metadata.
  * @return Void.
  */
 void create_object(plasma_store_state *plasma_state,
+                   int64_t client_index,
                    object_id object_id,
                    int64_t data_size,
                    int64_t metadata_size,
@@ -27,12 +29,12 @@ void create_object(plasma_store_state *plasma_state,
  *
  * @param plasma_state The plasma store state.
  * @param conn The client connection that requests the object.
- * @param index The index of the client making this request.
+ * @param client_index The index of the client making this request.
  * @param object_id Object ID of the object to be gotten.
  * @return The status of the object (object_status in plasma.h).
  */
 int get_object(plasma_store_state *plasma_state,
-               int64_t index,
+               int64_t client_index,
                int conn,
                object_id object_id,
                plasma_object *result);

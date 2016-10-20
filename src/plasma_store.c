@@ -147,8 +147,24 @@ plasma_store_state *init_plasma_store(event_loop *loop) {
   return state;
 }
 
+/* If this client is not already using object, add the client index to the
+ * object's list of clients, otherwise do nothing. */
+void record_client_using_object(object_table_entry *entry,
+                                int64_t client_index) {
+  /* Check if this client is already using the object. */
+  for (int64_t *ci = (int64_t *) utarray_front(entry->clients); ci != NULL;
+       ci = (int64_t *) utarray_next(entry->clients, ci)) {
+    if (*ci == client_index) {
+      return;
+    }
+  }
+  /* Add the client index to the list of clients using this object. */
+  utarray_push_back(entry->clients, &client_index);
+}
+
 /* Create a new object buffer in the hash table. */
 void create_object(plasma_store_state *plasma_state,
+                   int64_t client_index,
                    object_id object_id,
                    int64_t data_size,
                    int64_t metadata_size,
@@ -170,7 +186,7 @@ void create_object(plasma_store_state *plasma_state,
   assert(fd != -1);
 
   entry = malloc(sizeof(object_table_entry));
-  memcpy(&entry->object_id, &object_id, 20);
+  memcpy(&entry->object_id, &object_id, sizeof(object_id));
   entry->info.data_size = data_size;
   entry->info.metadata_size = metadata_size;
   entry->pointer = pointer;
@@ -187,30 +203,13 @@ void create_object(plasma_store_state *plasma_state,
   result->metadata_offset = offset + data_size;
   result->data_size = data_size;
   result->metadata_size = metadata_size;
-}
-
-/* If this client is not already using object, add the client index to the
- * object's list of clients, otherwise do nothing. */
-void record_client_using_object(object_table_entry *entry,
-                                int64_t client_index) {
-  /* Check if this client is already using the object. */
-  int client_index_present = 0;
-  for (int64_t *ci = (int64_t *) utarray_front(entry->clients); ci != NULL;
-       ci = (int64_t *) utarray_next(entry->clients, ci)) {
-    if (*ci == client_index) {
-      client_index_present = 1;
-      break;
-    }
-  }
-  if (!client_index_present) {
-    /* Add the client index to the list of clients using this object. */
-    utarray_push_back(entry->clients, &client_index);
-  }
+  /* Record that this client is using this object. */
+  record_client_using_object(entry, client_index);
 }
 
 /* Get an object from the hash table. */
 int get_object(plasma_store_state *plasma_state,
-               int64_t index,
+               int64_t client_index,
                int conn,
                object_id object_id,
                plasma_object *result) {
@@ -226,7 +225,7 @@ int get_object(plasma_store_state *plasma_state,
     result->metadata_size = entry->info.metadata_size;
     /* If necessary, record that this client is using this object. In the case
      * where entry == NULL, this will be called from seal_object. */
-    record_client_using_object(entry, index);
+    record_client_using_object(entry, client_index);
     return OBJECT_FOUND;
   } else {
     object_notify_entry *notify_entry;
@@ -241,7 +240,7 @@ int get_object(plasma_store_state *plasma_state,
       HASH_ADD(handle, plasma_state->objects_notify, object_id,
                sizeof(object_id), notify_entry);
     }
-    utarray_push_back(notify_entry->waiting_client_indices, &index);
+    utarray_push_back(notify_entry->waiting_client_indices, &client_index);
   }
   return OBJECT_NOT_FOUND;
 }
@@ -271,12 +270,21 @@ int remove_client_from_object_clients(object_table_entry *entry,
 void release_object(plasma_store_state *plasma_state,
                     int64_t index,
                     object_id object_id) {
-  object_table_entry *entry;
+  object_table_entry *open_entry;
+  object_table_entry *sealed_entry;
+
+  HASH_FIND(handle, plasma_state->open_objects, &object_id, sizeof(object_id),
+            open_entry);
   HASH_FIND(handle, plasma_state->sealed_objects, &object_id, sizeof(object_id),
-            entry);
-  CHECK(entry != NULL);
+            sealed_entry);
+  /* Exactly one of open_entry and sealed_entry should be NULL. */
+  CHECK((open_entry == NULL) != (sealed_entry == NULL));
   /* Remove the client index from the object's array of clients. */
-  CHECK(remove_client_from_object_clients(entry, index) == 1);
+  if (open_entry != NULL) {
+    CHECK(remove_client_from_object_clients(open_entry, index) == 1);
+  } else {
+    CHECK(remove_client_from_object_clients(sealed_entry, index) == 1);
+  }
 }
 
 /* Check if an object is present. */
@@ -444,8 +452,8 @@ void process_message(event_loop *loop,
   /* Process the different types of requests. */
   switch (type) {
   case PLASMA_CREATE:
-    create_object(plasma_state, req->object_ids[0], req->data_size,
-                  req->metadata_size, &reply.object);
+    create_object(plasma_state, client_index, req->object_ids[0],
+                  req->data_size, req->metadata_size, &reply.object);
     send_fd(client_sock, reply.object.handle.store_fd, (char *) &reply,
             sizeof(reply));
     break;
@@ -501,10 +509,12 @@ void new_client_connection(event_loop *loop,
   HASH_REPLACE_INT(plasma_state->client_map, sock, new_client_map_entry,
                    old_client_map_entry);
   if (old_client_map_entry) {
-    /* TODO(rkn): If we reuse a socket, we have to make sure that callbacks from
-     * the old client don't get used for the new client. */
     LOG_INFO("reusing an old socket (fd %d) for a new client", new_socket);
     free(old_client_map_entry);
+    /* TODO(rkn): If we reuse a socket, we have to make sure that callbacks from
+     * the old client don't get used for the new client. Handle this
+     * properly. */
+    CHECK(0);
   }
   /* Add the new client to the array of clients. The index of the client in this
    * array will identify the client throughout this program. */
