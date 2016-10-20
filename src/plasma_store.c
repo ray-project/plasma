@@ -76,10 +76,12 @@ typedef struct {
 } object_notify_entry;
 
 /** Contains all information that is associated with a client. */
-typedef struct {
+struct client {
   /** The socket used to communicate with the client. */
   int sock;
-} client;
+  /** A pointer to the global plasma state. */
+  plasma_store_state *plasma_state;
+};
 
 /* This is used to define the array of clients used to define the
  * object_table_entry type. */
@@ -163,13 +165,14 @@ void record_client_using_object(object_table_entry *entry,
 }
 
 /* Create a new object buffer in the hash table. */
-void create_object(plasma_store_state *plasma_state,
+void create_object(client *client_context,
                    int64_t client_index,
                    object_id object_id,
                    int64_t data_size,
                    int64_t metadata_size,
                    plasma_object *result) {
   LOG_DEBUG("creating object"); /* TODO(pcm): add object_id here */
+  plasma_store_state *plasma_state = client_context->plasma_state;
 
   object_table_entry *entry;
   /* TODO(swang): Return these error to the client instead of exiting. */
@@ -210,11 +213,12 @@ void create_object(plasma_store_state *plasma_state,
 }
 
 /* Get an object from the hash table. */
-int get_object(plasma_store_state *plasma_state,
+int get_object(client *client_context,
                int64_t client_index,
                int conn,
                object_id object_id,
                plasma_object *result) {
+  plasma_store_state *plasma_state = client_context->plasma_state;
   object_table_entry *entry;
   HASH_FIND(handle, plasma_state->sealed_objects, &object_id, sizeof(object_id),
             entry);
@@ -269,9 +273,10 @@ int remove_client_from_object_clients(object_table_entry *entry,
   return 0;
 }
 
-void release_object(plasma_store_state *plasma_state,
+void release_object(client *client_context,
                     int64_t client_index,
                     object_id object_id) {
+  plasma_store_state *plasma_state = client_context->plasma_state;
   object_table_entry *open_entry;
   object_table_entry *sealed_entry;
 
@@ -290,7 +295,8 @@ void release_object(plasma_store_state *plasma_state,
 }
 
 /* Check if an object is present. */
-int contains_object(plasma_store_state *plasma_state, object_id object_id) {
+int contains_object(client *client_context, object_id object_id) {
+  plasma_store_state *plasma_state = client_context->plasma_state;
   object_table_entry *entry;
   HASH_FIND(handle, plasma_state->sealed_objects, &object_id, sizeof(object_id),
             entry);
@@ -298,8 +304,9 @@ int contains_object(plasma_store_state *plasma_state, object_id object_id) {
 }
 
 /* Seal an object that has been created in the hash table. */
-void seal_object(plasma_store_state *plasma_state, object_id object_id) {
+void seal_object(client *client_context, object_id object_id) {
   LOG_DEBUG("sealing object");  // TODO(pcm): add object_id here
+  plasma_store_state *plasma_state = client_context->plasma_state;
   object_table_entry *entry;
   HASH_FIND(handle, plasma_state->open_objects, &object_id, sizeof(object_id),
             entry);
@@ -351,8 +358,9 @@ void seal_object(plasma_store_state *plasma_state, object_id object_id) {
 }
 
 /* Delete an object that has been created in the hash table. */
-void delete_object(plasma_store_state *plasma_state, object_id object_id) {
+void delete_object(client *client_context, object_id object_id) {
   LOG_DEBUG("deleting object");  // TODO(rkn): add object_id here
+  plasma_store_state *plasma_state = client_context->plasma_state;
   object_table_entry *entry;
   HASH_FIND(handle, plasma_state->sealed_objects, &object_id, sizeof(object_id),
             entry);
@@ -375,7 +383,6 @@ void send_notifications(event_loop *loop,
                         void *context,
                         int events) {
   plasma_store_state *plasma_state = context;
-
   notification_queue *queue;
   HASH_FIND_INT(plasma_state->pending_notifications, &client_sock, queue);
   CHECK(queue != NULL);
@@ -405,10 +412,11 @@ void send_notifications(event_loop *loop,
 }
 
 /* Subscribe to notifications about sealed objects. */
-void subscribe_to_updates(plasma_store_state *plasma_state,
+void subscribe_to_updates(client *client_context,
                           int64_t index,
                           int conn) {
   LOG_DEBUG("subscribing to updates");
+  plasma_store_state *plasma_state = client_context->plasma_state;
   char dummy;
   int fd = recv_fd(conn, &dummy, 1);
   CHECKM(HASH_CNT(handle, plasma_state->open_objects) == 0,
@@ -440,7 +448,8 @@ void process_message(event_loop *loop,
                      int client_sock,
                      void *context,
                      int events) {
-  plasma_store_state *plasma_state = context;
+  client *client_context = context;
+  plasma_store_state *plasma_state = client_context->plasma_state;
   int64_t type;
   int64_t length;
   plasma_request *req;
@@ -456,35 +465,35 @@ void process_message(event_loop *loop,
   /* Process the different types of requests. */
   switch (type) {
   case PLASMA_CREATE:
-    create_object(plasma_state, client_index, req->object_ids[0],
+    create_object(client_context, client_index, req->object_ids[0],
                   req->data_size, req->metadata_size, &reply.object);
     send_fd(client_sock, reply.object.handle.store_fd, (char *) &reply,
             sizeof(reply));
     break;
   case PLASMA_GET:
-    if (get_object(plasma_state, client_index, client_sock, req->object_ids[0],
+    if (get_object(client_context, client_index, client_sock, req->object_ids[0],
                    &reply.object) == OBJECT_FOUND) {
       send_fd(client_sock, reply.object.handle.store_fd, (char *) &reply,
               sizeof(reply));
     }
     break;
   case PLASMA_RELEASE:
-    release_object(plasma_state, client_index, req->object_ids[0]);
+    release_object(client_context, client_index, req->object_ids[0]);
     break;
   case PLASMA_CONTAINS:
-    if (contains_object(plasma_state, req->object_ids[0]) == OBJECT_FOUND) {
+    if (contains_object(client_context, req->object_ids[0]) == OBJECT_FOUND) {
       reply.has_object = 1;
     }
     plasma_send_reply(client_sock, &reply);
     break;
   case PLASMA_SEAL:
-    seal_object(plasma_state, req->object_ids[0]);
+    seal_object(client_context, req->object_ids[0]);
     break;
   case PLASMA_DELETE:
-    delete_object(plasma_state, req->object_ids[0]);
+    delete_object(client_context, req->object_ids[0]);
     break;
   case PLASMA_SUBSCRIBE:
-    subscribe_to_updates(plasma_state, client_index, client_sock);
+    subscribe_to_updates(client_context, client_index, client_sock);
     break;
   case DISCONNECT_CLIENT: {
     LOG_DEBUG("Disconnecting client on fd %d", client_sock);
@@ -508,7 +517,8 @@ void new_client_connection(event_loop *loop,
   /* Add the mapping from socket to client index to the client_index table. */
   client_map_entry *new_client_map_entry = malloc(sizeof(client_map_entry));
   new_client_map_entry->sock = new_socket;
-  new_client_map_entry->client_index = utarray_len(plasma_state->clients);
+  int64_t client_index = utarray_len(plasma_state->clients);
+  new_client_map_entry->client_index = client_index;
   client_map_entry *old_client_map_entry;
   HASH_REPLACE_INT(plasma_state->client_map, sock, new_client_map_entry,
                    old_client_map_entry);
@@ -520,13 +530,17 @@ void new_client_connection(event_loop *loop,
      * properly. */
     CHECK(0);
   }
+  /* Create a new client object. This will also be used as the context to use
+   * for events on this client's socket. TODO(rkn): free this somewhere. */
+  client client_struct = {.sock = new_socket, .plasma_state = plasma_state};
   /* Add the new client to the array of clients. The index of the client in this
    * array will identify the client throughout this program. */
-  client client = {.sock = new_socket};
-  utarray_push_back(plasma_state->clients, &client);
+  utarray_push_back(plasma_state->clients, &client_struct);
   /* Add an event to the event loop to process messages from this client. */
+  client *client_context =
+      (client *) utarray_eltptr(plasma_state->clients, client_index);
   event_loop_add_file(loop, new_socket, EVENT_LOOP_READ, process_message,
-                      context);
+                      client_context);
   LOG_DEBUG("new connection with fd %d", new_socket);
 }
 

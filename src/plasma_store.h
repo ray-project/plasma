@@ -3,19 +3,21 @@
 
 #include "plasma.h"
 
+typedef struct client client;
+
 typedef struct plasma_store_state plasma_store_state;
 
 /**
  * Create a new object:
  *
- * @param plasma_state The plasma store state.
+ * @param client_context The context of the client making this request.
  * @param client_index The index of the client making this request.
  * @param object_id Object ID of the object to be created.
  * @param data_size Size in bytes of the object to be created.
  * @param metadata_size Size in bytes of the object metadata.
  * @return Void.
  */
-void create_object(plasma_store_state *plasma_state,
+void create_object(client *client_context,
                    int64_t client_index,
                    object_id object_id,
                    int64_t data_size,
@@ -27,13 +29,13 @@ void create_object(plasma_store_state *plasma_state,
  * eventually have this object sealed. If the object has not yet been sealed,
  * the client that requested the object will be notified when it is sealed.
  *
- * @param plasma_state The plasma store state.
+ * @param client_context The context of the client making this request.
  * @param conn The client connection that requests the object.
  * @param client_index The index of the client making this request.
  * @param object_id Object ID of the object to be gotten.
  * @return The status of the object (object_status in plasma.h).
  */
-int get_object(plasma_store_state *plasma_state,
+int get_object(client *client_context,
                int64_t client_index,
                int conn,
                object_id object_id,
@@ -42,41 +44,41 @@ int get_object(plasma_store_state *plasma_state,
 /**
  * Record the fact that a particular client is no longer using an object.
  *
- * @param plasma_state The plasma store state.
+ * @param client_context The context of the client making this request.
  * @param client_index The index of the client making this request.
  * @param object_id The object ID of the object that is being released.
  * @param Void.
  */
-void release_object(plasma_store_state *plasma_state,
+void release_object(client *client_context,
                     int64_t client_index,
                     object_id object_id);
 
 /**
  * Seal an object. The object is now immutable and can be accessed with get.
  *
- * @param plasma_state The plasma store state.
+ * @param client_context The context of the client making this request.
  * @param object_id Object ID of the object to be sealed.
  * @return Void.
  */
-void seal_object(plasma_store_state *plasma_state, object_id object_id);
+void seal_object(client *client_context, object_id object_id);
 
 /**
  * Check if the plasma store contains an object:
  *
- * @param plasma_state The plasma store state.
+ * @param client_context The context of the client making this request.
  * @param object_id Object ID that will be checked.
  * @return OBJECT_FOUND if the object is in the store, OBJECT_NOT_FOUND if not
  */
-int contains_object(plasma_store_state *plasma_state, object_id object_id);
+int contains_object(client *client_context, object_id object_id);
 
 /**
  * Delete an object from the plasma store:
  *
- * @param plasma_state The plasma store state.
+ * @param client_context The context of the client making this request.
  * @param object_id Object ID of the object to be deleted.
  * @return Void.
  */
-void delete_object(plasma_store_state *plasma_state, object_id object_id);
+void delete_object(client *client_context, object_id object_id);
 
 /**
  * Send notifications about sealed objects to the subscribers. This is called
@@ -85,14 +87,14 @@ void delete_object(plasma_store_state *plasma_state, object_id object_id);
  *
  * @param loop The Plasma store event loop.
  * @param client_sock The socket of the client to send the notification to.
- * @param context The plasma store global state.
+ * @param plasma_state The plasma store global state.
  * @param events This is needed for this function to have the signature of a
           callback.
  * @return Void.
  */
 void send_notifications(event_loop *loop,
                         int client_sock,
-                        void *context,
+                        void *plasma_state,
                         int events);
 
 /**
