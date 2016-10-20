@@ -172,10 +172,12 @@ void create_object(plasma_store_state *plasma_state,
   LOG_DEBUG("creating object"); /* TODO(pcm): add object_id here */
 
   object_table_entry *entry;
+  /* TODO(swang): Return these error to the client instead of exiting. */
   HASH_FIND(handle, plasma_state->open_objects, &object_id, sizeof(object_id),
             entry);
-  /* TODO(swang): Return this error to the client instead of
-   * exiting. */
+  CHECKM(entry == NULL, "Cannot create object twice.");
+  HASH_FIND(handle, plasma_state->sealed_objects, &object_id, sizeof(object_id),
+            entry);
   CHECKM(entry == NULL, "Cannot create object twice.");
 
   uint8_t *pointer = dlmalloc(data_size + metadata_size);
@@ -268,7 +270,7 @@ int remove_client_from_object_clients(object_table_entry *entry,
 }
 
 void release_object(plasma_store_state *plasma_state,
-                    int64_t index,
+                    int64_t client_index,
                     object_id object_id) {
   object_table_entry *open_entry;
   object_table_entry *sealed_entry;
@@ -281,9 +283,9 @@ void release_object(plasma_store_state *plasma_state,
   CHECK((open_entry == NULL) != (sealed_entry == NULL));
   /* Remove the client index from the object's array of clients. */
   if (open_entry != NULL) {
-    CHECK(remove_client_from_object_clients(open_entry, index) == 1);
+    CHECK(remove_client_from_object_clients(open_entry, client_index) == 1);
   } else {
-    CHECK(remove_client_from_object_clients(sealed_entry, index) == 1);
+    CHECK(remove_client_from_object_clients(sealed_entry, client_index) == 1);
   }
 }
 
@@ -358,6 +360,8 @@ void delete_object(plasma_store_state *plasma_state, object_id object_id) {
    * error. Maybe we should also support deleting objects that have been created
    * but not sealed. */
   CHECKM(entry != NULL, "To delete an object it must have been sealed.");
+  CHECKM(utarray_len(entry->clients) == 0,
+         "To delete an object, there must be no clients currently using it.");
   uint8_t *pointer = entry->pointer;
   HASH_DELETE(handle, plasma_state->sealed_objects, entry);
   dlfree(pointer);

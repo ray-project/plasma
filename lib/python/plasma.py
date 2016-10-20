@@ -52,6 +52,10 @@ class PlasmaBuffer(object):
     """
     self.buffer[index] = value
 
+  def __len__(self):
+    """Return the length of the buffer."""
+    return len(self.buffer)
+
 class PlasmaClient(object):
   """The PlasmaClient is used to interface with a plasma store and a plasma manager.
 
@@ -150,7 +154,7 @@ class PlasmaClient(object):
     metadata_size = ctypes.c_int64()
     metadata = ctypes.c_void_p()
     self.client.plasma_get(self.plasma_conn, make_plasma_id(object_id), ctypes.byref(size), ctypes.byref(data), ctypes.byref(metadata_size), ctypes.byref(metadata))
-    return self.buffer_from_memory(metadata, metadata_size)
+    return PlasmaBuffer(self.buffer_from_memory(metadata, metadata_size), make_plasma_id(object_id), self)
 
   def contains(self, object_id):
     """Check if the object is present and has been sealed in the PlasmaStore.

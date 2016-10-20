@@ -505,6 +505,8 @@ void process_data_request(event_loop *loop,
   buf->data_size = data_size;
   buf->metadata_size = metadata_size;
 
+  /* The corresponding call to plasma_release should happen in
+   * process_data_chunk. */
   plasma_create(conn->manager_state->plasma_conn, object_id, data_size, NULL,
                 metadata_size, &(buf->data));
   LL_APPEND(conn->transfer_queue, buf);
