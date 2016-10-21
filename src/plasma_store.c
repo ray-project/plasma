@@ -374,8 +374,7 @@ void send_notifications(event_loop *loop,
 }
 
 /* Subscribe to notifications about sealed objects. */
-void subscribe_to_updates(client *client_context,
-                          int conn) {
+void subscribe_to_updates(client *client_context, int conn) {
   LOG_DEBUG("subscribing to updates");
   plasma_store_state *plasma_state = client_context->plasma_state;
   char dummy;
@@ -445,8 +444,17 @@ void process_message(event_loop *loop,
     break;
   case DISCONNECT_CLIENT: {
     LOG_DEBUG("Disconnecting client on fd %d", client_sock);
-    /* TODO(rkn): More cleanup needs to happen here. */
     event_loop_remove_file(loop, client_sock);
+    /* If this client was using any objects, remove it from the appropriate
+     * lists. */
+    plasma_store_state *plasma_state = client_context->plasma_state;
+    object_table_entry *entry, *temp_entry;
+    HASH_ITER(handle, plasma_state->open_objects, entry, temp_entry) {
+      remove_client_from_object_clients(entry, client_context);
+    }
+    HASH_ITER(handle, plasma_state->sealed_objects, entry, temp_entry) {
+      remove_client_from_object_clients(entry, client_context);
+    }
   } break;
   default:
     /* This code should be unreachable. */
