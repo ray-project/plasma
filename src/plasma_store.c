@@ -128,8 +128,8 @@ plasma_store_state *init_plasma_store(event_loop *loop) {
 
 /* If this client is not already using the object, add the client to the
  * object's list of clients, otherwise do nothing. */
-void record_client_using_object(object_table_entry *entry,
-                                client *client_info) {
+void add_client_to_object_clients(object_table_entry *entry,
+                                  client *client_info) {
   /* Check if this client is already using the object. */
   for (int i = 0; i < utarray_len(entry->clients); ++i) {
     client **c = (client **) utarray_eltptr(entry->clients, i);
@@ -185,7 +185,7 @@ void create_object(client *client_context,
   result->data_size = data_size;
   result->metadata_size = metadata_size;
   /* Record that this client is using this object. */
-  record_client_using_object(entry, client_context);
+  add_client_to_object_clients(entry, client_context);
 }
 
 /* Get an object from the hash table. */
@@ -206,7 +206,7 @@ int get_object(client *client_context,
     result->metadata_size = entry->info.metadata_size;
     /* If necessary, record that this client is using this object. In the case
      * where entry == NULL, this will be called from seal_object. */
-    record_client_using_object(entry, client_context);
+    add_client_to_object_clients(entry, client_context);
     return OBJECT_FOUND;
   } else {
     object_notify_entry *notify_entry;
@@ -313,7 +313,7 @@ void seal_object(client *client_context, object_id object_id) {
       send_fd((*c)->sock, reply.object.handle.store_fd, (char *) &reply,
               sizeof(reply));
       /* Record that the client is using this object. */
-      record_client_using_object(entry, *c);
+      add_client_to_object_clients(entry, *c);
     }
     utarray_free(notify_entry->waiting_clients);
     free(notify_entry);
