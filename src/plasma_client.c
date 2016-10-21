@@ -432,3 +432,7 @@ void plasma_fetch(plasma_connection *conn,
            "Received unexpected object ID from manager during fetch.");
   }
 }
+
+int get_manager_fd(plasma_connection *conn) {
+  return conn->manager_conn;
+}

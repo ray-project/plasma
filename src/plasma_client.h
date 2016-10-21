@@ -195,4 +195,13 @@ void plasma_fetch(plasma_connection *conn,
  */
 int plasma_subscribe(plasma_connection *conn);
 
+/**
+ * Get the file descriptor for the socket connection to the plasma manager.
+ *
+ * @param conn The plasma connection.
+ * @return The file descriptor for the manager connection. If there is no
+ *         connection to the manager, this is -1.
+ */
+int get_manager_fd(plasma_connection *conn);
+
 #endif

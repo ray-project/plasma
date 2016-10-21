@@ -4,7 +4,25 @@
 #include <poll.h>
 #include "utarray.h"
 
+#define NUM_RETRIES 5
+
+/* Timeouts are in milliseconds. */
+#ifndef RAY_TIMEOUT
+#define MANAGER_TIMEOUT 1000
+#else
+#define MANAGER_TIMEOUT RAY_TIMEOUT
+#endif
+
+typedef struct plasma_manager_state plasma_manager_state;
 typedef struct client_connection client_connection;
+typedef struct client_object_connection client_object_connection;
+
+plasma_manager_state *init_plasma_manager_state(const char *store_socket_name,
+                                                const char *manager_addr,
+                                                int manager_port,
+                                                const char *db_addr,
+                                                int db_port);
+void destroy_plasma_manager_state(plasma_manager_state *state);
 
 /**
  * Process a request from another object store manager to transfer an object.
@@ -124,10 +142,10 @@ void send_queued_request(event_loop *loop,
  * @param context The plasma manager state.
  * @return Void.
  */
-void new_client_connection(event_loop *loop,
-                           int listener_sock,
-                           void *context,
-                           int events);
+client_connection *new_client_connection(event_loop *loop,
+                                         int listener_sock,
+                                         void *context,
+                                         int events);
 
 /* The buffer size in bytes. Data will get transfered in multiples of this */
 #define BUFSIZE 4096
