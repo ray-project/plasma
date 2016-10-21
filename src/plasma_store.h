@@ -8,7 +8,8 @@ typedef struct client client;
 typedef struct plasma_store_state plasma_store_state;
 
 /**
- * Create a new object:
+ * Create a new object. The client must do a call to release_object to tell the
+ * store when it is done with the object.
  *
  * @param client_context The context of the client making this request.
  * @param object_id Object ID of the object to be created.
@@ -23,9 +24,12 @@ void create_object(client *client_context,
                    plasma_object *result);
 
 /**
- * Get an object. This method assumes that we currently have or will
- * eventually have this object sealed. If the object has not yet been sealed,
- * the client that requested the object will be notified when it is sealed.
+ * Get an object. This method assumes that we currently have or will eventually
+ * have this object sealed. If the object has not yet been sealed, the client
+ * that requested the object will be notified when it is sealed.
+ *
+ * For each call to get_object, the client must do a call to release_object to
+ * tell the store when it is done with the object.
  *
  * @param client_context The context of the client making this request.
  * @param conn The client connection that requests the object.
@@ -44,8 +48,7 @@ int get_object(client *client_context,
  * @param object_id The object ID of the object that is being released.
  * @param Void.
  */
-void release_object(client *client_context,
-                    object_id object_id);
+void release_object(client *client_context, object_id object_id);
 
 /**
  * Seal an object. The object is now immutable and can be accessed with get.

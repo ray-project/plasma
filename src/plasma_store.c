@@ -126,13 +126,13 @@ plasma_store_state *init_plasma_store(event_loop *loop) {
   return state;
 }
 
-/* If this client is not already using object, add the client index to the
+/* If this client is not already using the object, add the client to the
  * object's list of clients, otherwise do nothing. */
 void record_client_using_object(object_table_entry *entry,
                                 client *client_info) {
   /* Check if this client is already using the object. */
-  for (client **c = (client **) utarray_front(entry->clients); c != NULL;
-       c = (client **) utarray_next(entry->clients, c)) {
+  for (int i = 0; i < utarray_len(entry->clients); ++i) {
+    client **c = (client **) utarray_eltptr(entry->clients, i);
     if (*c == client_info) {
       return;
     }
@@ -228,28 +228,21 @@ int get_object(client *client_context,
 
 int remove_client_from_object_clients(object_table_entry *entry,
                                       client *client_info) {
-  /* Find the location of the client index in the array. */
-  int i = 0;
-  for (client **c = (client **) utarray_front(entry->clients); c != NULL;
-       c = (client **) utarray_next(entry->clients, c)) {
+  /* Find the location of the client in the array. */
+  for (int i = 0; i < utarray_len(entry->clients); ++i) {
+    client **c = (client **) utarray_eltptr(entry->clients, i);
     if (*c == client_info) {
-      break;
+      /* Remove the client from the array. */
+      utarray_erase(entry->clients, i, 1);
+      /* Return 1 to indicate that the client was removed. */
+      return 1;
     }
-    i += 1;
   }
-  /* Check if the client index actually appeared in the array. */
-  if (i < utarray_len(entry->clients)) {
-    /* Remove the client index from the array. */
-    utarray_erase(entry->clients, i, 1);
-    /* Return 1 to indicate that the client index was removed. */
-    return 1;
-  }
-  /* Return 0 to indicate that the client index was not removed. */
+  /* Return 0 to indicate that the client was not removed. */
   return 0;
 }
 
-void release_object(client *client_context,
-                    object_id object_id) {
+void release_object(client *client_context, object_id object_id) {
   plasma_store_state *plasma_state = client_context->plasma_state;
   object_table_entry *open_entry;
   object_table_entry *sealed_entry;
@@ -260,7 +253,7 @@ void release_object(client *client_context,
             sealed_entry);
   /* Exactly one of open_entry and sealed_entry should be NULL. */
   CHECK((open_entry == NULL) != (sealed_entry == NULL));
-  /* Remove the client index from the object's array of clients. */
+  /* Remove the client from the object's array of clients. */
   if (open_entry != NULL) {
     CHECK(remove_client_from_object_clients(open_entry, client_context) == 1);
   } else {
@@ -315,10 +308,8 @@ void seal_object(client *client_context, object_id object_id) {
     result->metadata_size = entry->info.metadata_size;
     HASH_DELETE(handle, plasma_state->objects_notify, notify_entry);
     /* Send notifications to the clients that were waiting for this object. */
-    for (client **c =
-             (client **) utarray_front(notify_entry->waiting_clients);
-         c != NULL;
-         c = (client **) utarray_next(notify_entry->waiting_clients, c)) {
+    for (int i = 0; i < utarray_len(notify_entry->waiting_clients); ++i) {
+      client **c = (client **) utarray_eltptr(notify_entry->waiting_clients, i);
       send_fd((*c)->sock, reply.object.handle.store_fd, (char *) &reply,
               sizeof(reply));
       /* Record that the client is using this object. */
@@ -362,9 +353,8 @@ void send_notifications(event_loop *loop,
   int num_processed = 0;
   /* Loop over the array of pending notifications and send as many of them as
    * possible. */
-  for (object_id *obj_id = (object_id *) utarray_front(queue->object_ids);
-       obj_id != NULL;
-       obj_id = (object_id *) utarray_next(queue->object_ids, obj_id)) {
+  for (int i = 0; i < utarray_len(queue->object_ids); ++i) {
+    object_id *obj_id = (object_id *) utarray_eltptr(queue->object_ids, i);
     /* Attempt to send a notification about this object ID. */
     int nbytes = send(client_sock, obj_id, sizeof(object_id), 0);
     if (nbytes >= 0) {
