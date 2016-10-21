@@ -61,16 +61,15 @@ typedef struct {
   UT_hash_handle handle;
   /* Pointer to the object data. Needed to free the object. */
   uint8_t *pointer;
-  /** A hash table of the indices of the clients that are currently using this
-   *  object. */
+  /** An array of the clients that are currently using this object. */
   UT_array *clients;
 } object_table_entry;
 
 typedef struct {
   /* Object id of this object. */
   object_id object_id;
-  /* Indices of the waiting clients. */
-  UT_array *waiting_client_indices;
+  /* An array of the clients that are waiting to get this object. */
+  UT_array *waiting_clients;
   /* Handle for the uthash table. */
   UT_hash_handle handle;
 } object_notify_entry;
@@ -85,7 +84,7 @@ struct client {
 
 /* This is used to define the array of clients used to define the
  * object_table_entry type. */
-UT_icd client_icd = {sizeof(client), NULL, NULL, NULL};
+UT_icd client_icd = {sizeof(client *), NULL, NULL, NULL};
 
 /* This is used to define the array of object IDs used to define the
  * notification_queue type. */
@@ -101,20 +100,6 @@ typedef struct {
   UT_hash_handle hh;
 } notification_queue;
 
-/** Mapping from the socket fd of a client to its client_index. Note that if a
- *  client disconnects, its file descriptor can be reused for a new client. */
-typedef struct {
-  /** The socket fd of a client. */
-  int sock;
-  /** The index of the client in plasma_store_state->clients. */
-  int64_t client_index;
-  /** Handle for the hash table. */
-  UT_hash_handle hh;
-} client_map_entry;
-
-/* This is used to define arrays of client indices. */
-UT_icd int64_icd = {sizeof(int64_t), NULL, NULL, NULL};
-
 struct plasma_store_state {
   /* Event loop of the plasma store. */
   event_loop *loop;
@@ -129,12 +114,6 @@ struct plasma_store_state {
    *  the socket send buffers were full. This is a hash table from client file
    *  descriptor to an array of object_ids to send to that client. */
   notification_queue *pending_notifications;
-  /** List of clients available to this store. The index into this array is the
-   *  client_index and is used to identify clients throughout the program. */
-  UT_array *clients;
-  /** A hash table mapping the file descriptor used for a client to the index of
-   *  the client in the clients array. */
-  client_map_entry *client_map;
 };
 
 plasma_store_state *init_plasma_store(event_loop *loop) {
@@ -144,29 +123,26 @@ plasma_store_state *init_plasma_store(event_loop *loop) {
   state->sealed_objects = NULL;
   state->objects_notify = NULL;
   state->pending_notifications = NULL;
-  utarray_new(state->clients, &client_icd);
-  state->client_map = NULL;
   return state;
 }
 
 /* If this client is not already using object, add the client index to the
  * object's list of clients, otherwise do nothing. */
 void record_client_using_object(object_table_entry *entry,
-                                int64_t client_index) {
+                                client *client_info) {
   /* Check if this client is already using the object. */
-  for (int64_t *ci = (int64_t *) utarray_front(entry->clients); ci != NULL;
-       ci = (int64_t *) utarray_next(entry->clients, ci)) {
-    if (*ci == client_index) {
+  for (client **c = (client **) utarray_front(entry->clients); c != NULL;
+       c = (client **) utarray_next(entry->clients, c)) {
+    if (*c == client_info) {
       return;
     }
   }
-  /* Add the client index to the list of clients using this object. */
-  utarray_push_back(entry->clients, &client_index);
+  /* Add the client pointer to the list of clients using this object. */
+  utarray_push_back(entry->clients, &client_info);
 }
 
 /* Create a new object buffer in the hash table. */
 void create_object(client *client_context,
-                   int64_t client_index,
                    object_id object_id,
                    int64_t data_size,
                    int64_t metadata_size,
@@ -199,7 +175,7 @@ void create_object(client *client_context,
   entry->fd = fd;
   entry->map_size = map_size;
   entry->offset = offset;
-  utarray_new(entry->clients, &int64_icd);
+  utarray_new(entry->clients, &client_icd);
   HASH_ADD(handle, plasma_state->open_objects, object_id, sizeof(object_id),
            entry);
   result->handle.store_fd = fd;
@@ -209,12 +185,11 @@ void create_object(client *client_context,
   result->data_size = data_size;
   result->metadata_size = metadata_size;
   /* Record that this client is using this object. */
-  record_client_using_object(entry, client_index);
+  record_client_using_object(entry, client_context);
 }
 
 /* Get an object from the hash table. */
 int get_object(client *client_context,
-               int64_t client_index,
                int conn,
                object_id object_id,
                plasma_object *result) {
@@ -231,7 +206,7 @@ int get_object(client *client_context,
     result->metadata_size = entry->info.metadata_size;
     /* If necessary, record that this client is using this object. In the case
      * where entry == NULL, this will be called from seal_object. */
-    record_client_using_object(entry, client_index);
+    record_client_using_object(entry, client_context);
     return OBJECT_FOUND;
   } else {
     object_notify_entry *notify_entry;
@@ -241,23 +216,23 @@ int get_object(client *client_context,
     if (!notify_entry) {
       notify_entry = malloc(sizeof(object_notify_entry));
       memset(notify_entry, 0, sizeof(object_notify_entry));
-      utarray_new(notify_entry->waiting_client_indices, &int64_icd);
+      utarray_new(notify_entry->waiting_clients, &client_icd);
       memcpy(&notify_entry->object_id, &object_id, sizeof(object_id));
       HASH_ADD(handle, plasma_state->objects_notify, object_id,
                sizeof(object_id), notify_entry);
     }
-    utarray_push_back(notify_entry->waiting_client_indices, &client_index);
+    utarray_push_back(notify_entry->waiting_clients, &client_context);
   }
   return OBJECT_NOT_FOUND;
 }
 
 int remove_client_from_object_clients(object_table_entry *entry,
-                                      int64_t client_index) {
+                                      client *client_info) {
   /* Find the location of the client index in the array. */
   int i = 0;
-  for (int64_t *ci = (int64_t *) utarray_front(entry->clients); ci != NULL;
-       ci = (int64_t *) utarray_next(entry->clients, ci)) {
-    if (*ci == client_index) {
+  for (client **c = (client **) utarray_front(entry->clients); c != NULL;
+       c = (client **) utarray_next(entry->clients, c)) {
+    if (*c == client_info) {
       break;
     }
     i += 1;
@@ -274,7 +249,6 @@ int remove_client_from_object_clients(object_table_entry *entry,
 }
 
 void release_object(client *client_context,
-                    int64_t client_index,
                     object_id object_id) {
   plasma_store_state *plasma_state = client_context->plasma_state;
   object_table_entry *open_entry;
@@ -288,9 +262,9 @@ void release_object(client *client_context,
   CHECK((open_entry == NULL) != (sealed_entry == NULL));
   /* Remove the client index from the object's array of clients. */
   if (open_entry != NULL) {
-    CHECK(remove_client_from_object_clients(open_entry, client_index) == 1);
+    CHECK(remove_client_from_object_clients(open_entry, client_context) == 1);
   } else {
-    CHECK(remove_client_from_object_clients(sealed_entry, client_index) == 1);
+    CHECK(remove_client_from_object_clients(sealed_entry, client_context) == 1);
   }
 }
 
@@ -341,18 +315,16 @@ void seal_object(client *client_context, object_id object_id) {
     result->metadata_size = entry->info.metadata_size;
     HASH_DELETE(handle, plasma_state->objects_notify, notify_entry);
     /* Send notifications to the clients that were waiting for this object. */
-    for (int64_t *client_index =
-             (int64_t *) utarray_front(notify_entry->waiting_client_indices);
-         client_index != NULL;
-         client_index = (int64_t *) utarray_next(
-             notify_entry->waiting_client_indices, client_index)) {
-      int client_socket = client_index_to_socket(plasma_state, *client_index);
-      send_fd(client_socket, reply.object.handle.store_fd, (char *) &reply,
+    for (client **c =
+             (client **) utarray_front(notify_entry->waiting_clients);
+         c != NULL;
+         c = (client **) utarray_next(notify_entry->waiting_clients, c)) {
+      send_fd((*c)->sock, reply.object.handle.store_fd, (char *) &reply,
               sizeof(reply));
       /* Record that the client is using this object. */
-      record_client_using_object(entry, *client_index);
+      record_client_using_object(entry, *c);
     }
-    utarray_free(notify_entry->waiting_client_indices);
+    utarray_free(notify_entry->waiting_clients);
     free(notify_entry);
   }
 }
@@ -413,7 +385,6 @@ void send_notifications(event_loop *loop,
 
 /* Subscribe to notifications about sealed objects. */
 void subscribe_to_updates(client *client_context,
-                          int64_t index,
                           int conn) {
   LOG_DEBUG("subscribing to updates");
   plasma_store_state *plasma_state = client_context->plasma_state;
@@ -437,48 +408,35 @@ void subscribe_to_updates(client *client_context,
                       send_notifications, plasma_state);
 }
 
-int client_index_to_socket(plasma_store_state *plasma_state,
-                           int64_t client_index) {
-  CHECK(client_index < utarray_len(plasma_state->clients));
-  /* Return the client socket corresponding to this index. */
-  return ((client *) utarray_eltptr(plasma_state->clients, client_index))->sock;
-}
-
 void process_message(event_loop *loop,
                      int client_sock,
                      void *context,
                      int events) {
   client *client_context = context;
-  plasma_store_state *plasma_state = client_context->plasma_state;
   int64_t type;
   int64_t length;
   plasma_request *req;
   read_message(client_sock, &type, &length, (uint8_t **) &req);
-  /* Get the client index corresponding to this socket. */
-  client_map_entry *client_map_entry;
-  HASH_FIND_INT(plasma_state->client_map, &client_sock, client_map_entry);
-  CHECK(client_map_entry != NULL);
-  int64_t client_index = client_map_entry->client_index;
   /* We're only sending a single object ID at a time for now. */
   plasma_reply reply;
   memset(&reply, 0, sizeof(reply));
   /* Process the different types of requests. */
   switch (type) {
   case PLASMA_CREATE:
-    create_object(client_context, client_index, req->object_ids[0],
-                  req->data_size, req->metadata_size, &reply.object);
+    create_object(client_context, req->object_ids[0], req->data_size,
+                  req->metadata_size, &reply.object);
     send_fd(client_sock, reply.object.handle.store_fd, (char *) &reply,
             sizeof(reply));
     break;
   case PLASMA_GET:
-    if (get_object(client_context, client_index, client_sock, req->object_ids[0],
+    if (get_object(client_context, client_sock, req->object_ids[0],
                    &reply.object) == OBJECT_FOUND) {
       send_fd(client_sock, reply.object.handle.store_fd, (char *) &reply,
               sizeof(reply));
     }
     break;
   case PLASMA_RELEASE:
-    release_object(client_context, client_index, req->object_ids[0]);
+    release_object(client_context, req->object_ids[0]);
     break;
   case PLASMA_CONTAINS:
     if (contains_object(client_context, req->object_ids[0]) == OBJECT_FOUND) {
@@ -493,7 +451,7 @@ void process_message(event_loop *loop,
     delete_object(client_context, req->object_ids[0]);
     break;
   case PLASMA_SUBSCRIBE:
-    subscribe_to_updates(client_context, client_index, client_sock);
+    subscribe_to_updates(client_context, client_sock);
     break;
   case DISCONNECT_CLIENT: {
     LOG_DEBUG("Disconnecting client on fd %d", client_sock);
@@ -514,31 +472,12 @@ void new_client_connection(event_loop *loop,
                            int events) {
   plasma_store_state *plasma_state = context;
   int new_socket = accept_client(listener_sock);
-  /* Add the mapping from socket to client index to the client_index table. */
-  client_map_entry *new_client_map_entry = malloc(sizeof(client_map_entry));
-  new_client_map_entry->sock = new_socket;
-  int64_t client_index = utarray_len(plasma_state->clients);
-  new_client_map_entry->client_index = client_index;
-  client_map_entry *old_client_map_entry;
-  HASH_REPLACE_INT(plasma_state->client_map, sock, new_client_map_entry,
-                   old_client_map_entry);
-  if (old_client_map_entry) {
-    LOG_INFO("reusing an old socket (fd %d) for a new client", new_socket);
-    free(old_client_map_entry);
-    /* TODO(rkn): If we reuse a socket, we have to make sure that callbacks from
-     * the old client don't get used for the new client. Handle this
-     * properly. */
-    CHECK(0);
-  }
   /* Create a new client object. This will also be used as the context to use
    * for events on this client's socket. TODO(rkn): free this somewhere. */
-  client client_struct = {.sock = new_socket, .plasma_state = plasma_state};
-  /* Add the new client to the array of clients. The index of the client in this
-   * array will identify the client throughout this program. */
-  utarray_push_back(plasma_state->clients, &client_struct);
-  /* Add an event to the event loop to process messages from this client. */
-  client *client_context =
-      (client *) utarray_eltptr(plasma_state->clients, client_index);
+  client *client_context = (client *) malloc(sizeof(client));
+  client_context->sock = new_socket;
+  client_context->plasma_state = plasma_state;
+  /* Add a callback to handle events on this socket. */
   event_loop_add_file(loop, new_socket, EVENT_LOOP_READ, process_message,
                       client_context);
   LOG_DEBUG("new connection with fd %d", new_socket);

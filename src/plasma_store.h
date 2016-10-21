@@ -11,14 +11,12 @@ typedef struct plasma_store_state plasma_store_state;
  * Create a new object:
  *
  * @param client_context The context of the client making this request.
- * @param client_index The index of the client making this request.
  * @param object_id Object ID of the object to be created.
  * @param data_size Size in bytes of the object to be created.
  * @param metadata_size Size in bytes of the object metadata.
  * @return Void.
  */
 void create_object(client *client_context,
-                   int64_t client_index,
                    object_id object_id,
                    int64_t data_size,
                    int64_t metadata_size,
@@ -31,12 +29,10 @@ void create_object(client *client_context,
  *
  * @param client_context The context of the client making this request.
  * @param conn The client connection that requests the object.
- * @param client_index The index of the client making this request.
  * @param object_id Object ID of the object to be gotten.
  * @return The status of the object (object_status in plasma.h).
  */
 int get_object(client *client_context,
-               int64_t client_index,
                int conn,
                object_id object_id,
                plasma_object *result);
@@ -45,12 +41,10 @@ int get_object(client *client_context,
  * Record the fact that a particular client is no longer using an object.
  *
  * @param client_context The context of the client making this request.
- * @param client_index The index of the client making this request.
  * @param object_id The object ID of the object that is being released.
  * @param Void.
  */
 void release_object(client *client_context,
-                    int64_t client_index,
                     object_id object_id);
 
 /**
@@ -96,16 +90,5 @@ void send_notifications(event_loop *loop,
                         int client_sock,
                         void *plasma_state,
                         int events);
-
-/**
- * This is a helper method used internally to get the client socket
- * corresponding to a particular client index.
- *
- * @param plasma_state The Plasma store state.
- * @param client_index The index of the client in question.
- * @return The socket used to communicate with the client.
- */
-int client_index_to_socket(plasma_store_state *plasma_state,
-                           int64_t client_index);
 
 #endif /* PLASMA_STORE_H */
