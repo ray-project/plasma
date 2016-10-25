@@ -418,10 +418,11 @@ void plasma_fetch(plasma_connection *conn,
       CHECK(nbytes == sizeof(reply));
       success = reply.has_object;
     }
+    CHECK(reply.num_object_ids == 1);
     /* Update the correct index in is_fetched. */
     int i = 0;
     for (; i < num_object_ids; i++) {
-      if (memcmp(&object_ids[i], &reply.object_id, sizeof(object_id)) == 0) {
+      if (memcmp(&object_ids[i], &reply.object_ids[0], sizeof(object_id)) == 0) {
         /* Check that this isn't a duplicate response. */
         CHECK(!is_fetched[i]);
         is_fetched[i] = success;
@@ -431,4 +432,31 @@ void plasma_fetch(plasma_connection *conn,
     CHECKM(i != num_object_ids,
            "Received unexpected object ID from manager during fetch.");
   }
+}
+
+void plasma_wait(plasma_connection *conn,
+                 int num_object_ids,
+                 object_id object_ids[],
+                 uint64_t timeout,
+                 int num_returns,
+                 object_id return_object_ids[]) {
+  CHECK(conn->manager_conn >= 0);
+  plasma_request *req =
+          make_plasma_multiple_request(num_object_ids, object_ids);
+  req->num_returns = num_returns;
+  req->timeout = timeout;
+  LOG_DEBUG("Calling plasma wait");
+  plasma_send_request(conn->manager_conn, PLASMA_WAIT, req);
+  free(req);
+  int64_t return_size = sizeof(plasma_reply) + (num_returns - 1) * sizeof(object_id);
+  printf("XXX return_size = %" PRId64 "\n", return_size);
+  printf("XXX num_returns = %d\n", num_returns);
+  plasma_reply *reply = malloc(return_size);
+  printf("YYYY return_size = %" PRId64 "\n", return_size);
+  int nbytes = recv(conn->manager_conn, (uint8_t *) reply,
+                    return_size, MSG_WAITALL);
+  printf("nbytes = %d, return_size = %" PRId64 "\n", nbytes, return_size);
+  CHECK(nbytes == return_size);
+  memcpy(return_object_ids, reply->object_ids, num_returns * sizeof(object_id));
+  free(reply);
 }

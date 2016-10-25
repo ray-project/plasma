@@ -185,6 +185,17 @@ void plasma_fetch(plasma_connection *conn,
                   int is_fetched[]);
 
 /**
+ * Wait for objects to be created (right now, wait for local objects).
+ *
+ */
+void plasma_wait(plasma_connection *conn,
+                 int num_object_ids,
+                 object_id object_ids[],
+                 uint64_t timeout,
+                 int num_returns,
+                 object_id return_object_ids[]);
+
+/**
  * Subscribe to notifications when objects are sealed in the object store.
  * Whenever an object is sealed, a message will be written to the client socket
  * that is returned by this method.

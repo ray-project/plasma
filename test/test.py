@@ -233,7 +233,7 @@ class TestPlasmaManager(unittest.TestCase):
                                                "--port", str(redis_port)],
                                               stdout=FNULL)
       time.sleep(0.1)
-      manager_redis_args = ["-d", "{addr}:{port}".format(addr="127.0.0.1",
+      manager_redis_args = ["-r", "{addr}:{port}".format(addr="127.0.0.1",
                                                       port=redis_port)]
 
     # Start two PlasmaManagers.
@@ -339,6 +339,13 @@ class TestPlasmaManager(unittest.TestCase):
                               memory_buffer=memory_buffer1, metadata=metadata1)
       assert_get_object_equal(self, self.client2, self.client1, object_id2,
                               memory_buffer=memory_buffer2, metadata=metadata2)
+
+  # TODO(pcm): add wait tests:
+  # wait when all objects are already available locally
+  # wait when objects become locally available via seal
+  # wait when objects become locally available via transfer
+  # wait with timeout
+  # mix fetch and wait
 
   def test_transfer(self):
     for _ in range(100):

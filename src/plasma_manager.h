@@ -89,13 +89,39 @@ void process_fetch_request(client_connection *client_conn, object_id object_id);
  *
  * @param client_conn The connection context for the client that made the
  *        request.
- * @param object_id_count The number of object IDs requested.
+ * @param num_object_ids The number of object IDs requested.
  * @param object_ids[] The vector of object IDs requested.
  * @return Void.
  */
 void process_fetch_requests(client_connection *client_conn,
-                            int object_id_count,
+                            int num_object_ids,
                             object_id object_ids[]);
+
+/**
+ * Process a wait request from a client.
+ * @return client_conn The connection context for the client that made the
+ *         request.
+ * @param num_object_ids The number of object IDs we are waiting for.
+ * @param object_ids
+ * @return Void.
+ */
+void process_wait_request(client_connection *client_conn,
+                          int num_object_ids,
+                          object_id object_ids[],
+                          uint64_t timeout,
+                          int num_returns);
+
+/**
+ *
+ * @param loop
+ * @param client_sock
+ * @param context
+ * @param events
+ */
+void process_object_notification(event_loop *loop,
+                                 int client_sock,
+                                 void *context,
+                                 int events);
 
 /**
  * Send the next request queued for the other plasma manager connected to the

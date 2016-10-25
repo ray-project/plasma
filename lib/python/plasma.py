@@ -223,6 +223,26 @@ class PlasmaClient(object):
                              success_array);
     return [bool(success) for success in success_array]
 
+  def wait(self, object_ids, timeout, num_returns):
+    """Wait until num_returns objects out of the list of object_ids
+       are available and return them.
+
+    Args:
+      object_ids (List[str]): List of object IDs to wait for.
+      timeout (int): Return to the caller after timeout milliseconds.
+    """
+    if not self.has_manager_conn:
+      raise Exception("Not connected to the plasma manager socket")
+    object_id_array = (len(object_ids) * PlasmaID)()
+    for i, object_id in enumerate(object_ids):
+      object_id_array[i] = make_plasma_id(object_id)
+    return_id_array = (num_returns * PlasmaID)()
+    self.client.plasma_wait(self.plasma_conn,
+                            object_id_array._length_,
+                            object_id_array,
+                            timeout, num_returns, return_id_array)
+    return return_id_array
+
   def subscribe(self):
     """Subscribe to notifications about sealed objects."""
     fd = self.client.plasma_subscribe(self.plasma_conn)
