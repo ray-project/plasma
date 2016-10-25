@@ -282,7 +282,7 @@ void plasma_delete(plasma_connection *conn, object_id object_id) {
   plasma_send_request(conn->store_conn, PLASMA_DELETE, &req);
 }
 
-int plasma_evict(plasma_connection *conn, int num_bytes) {
+int64_t plasma_evict(plasma_connection *conn, int64_t num_bytes) {
   /* Send a request to the store to evict objects. */
   plasma_request req = {.num_bytes = num_bytes};
   plasma_send_request(conn->store_conn, PLASMA_EVICT, &req);

@@ -181,15 +181,19 @@ void create_object(client *client_context,
   plasma_store_state *plasma_state = client_context->plasma_state;
 
   /* Check if there is enough space to create the object. */
-  int64_t required_space = plasma_state->memory_used + data_size + metadata_size
-                               - plasma_state->memory_capacity;
+  int64_t required_space = plasma_state->memory_used + data_size +
+                           metadata_size - plasma_state->memory_capacity;
   if (required_space > 0) {
     /* Try to free up one hundred times as much free space as we need right now.
      */
+    LOG_DEBUG("not enough space to create this object, so evicting objects");
+    printf("There is not enough space to create this object, so evicting objects.\n");
     int64_t num_bytes_evicted =
         evict_objects(client_context, 100 * required_space);
+    printf("Evicted %lld bytes.\n", num_bytes_evicted);
     CHECK(num_bytes_evicted >= required_space);
   }
+  plasma_state->memory_used += (data_size + metadata_size);
 
   object_table_entry *entry;
   /* TODO(swang): Return these error to the client instead of exiting. */
@@ -388,9 +392,9 @@ void delete_object(client *client_context, object_id object_id) {
 }
 
 /* Remove the least recently released objects. */
-int evict_objects(client *client_context, int num_bytes) {
+int64_t evict_objects(client *client_context, int64_t num_bytes) {
   int num_objects_evicted = 0;
-  int num_bytes_evicted = 0;
+  int64_t num_bytes_evicted = 0;
   plasma_store_state *plasma_state = client_context->plasma_state;
   for (int i = 0; i < utarray_len(plasma_state->released_objects); ++i) {
     if (num_bytes_evicted >= num_bytes) {
@@ -411,6 +415,7 @@ int evict_objects(client *client_context, int num_bytes) {
   }
   /* Remove the deleted objects from the released objects. */
   utarray_erase(plasma_state->released_objects, 0, num_objects_evicted);
+  plasma_state->memory_used -= num_bytes_evicted;
   return num_bytes_evicted;
 }
 

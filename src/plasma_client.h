@@ -173,7 +173,7 @@ void plasma_delete(plasma_connection *conn, object_id object_id);
  * @param num_bytes The number of bytes to try to free up.
  * @return The total number of bytes of space retrieved.
  */
-int plasma_evict(plasma_connection *conn, int num_bytes);
+int64_t plasma_evict(plasma_connection *conn, int64_t num_bytes);
 
 /**
  * Fetch objects from remote plasma stores that have the

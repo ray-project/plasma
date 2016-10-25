@@ -78,7 +78,7 @@ typedef struct {
    *  the object to. */
   int port;
   /** A number of bytes. This is used for eviction requests. */
-  int num_bytes;
+  int64_t num_bytes;
   /** The number of object IDs that will be included in this request. */
   int num_object_ids;
   /** The IDs of the objects that the request is about. */
@@ -96,7 +96,7 @@ typedef struct {
    *  plasma_fetch. */
   int has_object;
   /** A number of bytes. This is used for replies to eviction requests. */
-  int num_bytes;
+  int64_t num_bytes;
 } plasma_reply;
 
 #endif

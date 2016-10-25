@@ -85,7 +85,7 @@ void delete_object(client *client_context, object_id object_id);
  * @param num_bytes The number of bytes to try to free up.
  * @return The total number of bytes of space retrieved.
  */
-int evict_objects(client *client_context, int num_bytes);
+int64_t evict_objects(client *client_context, int64_t num_bytes);
 
 /**
  * Send notifications about sealed objects to the subscribers. This is called
