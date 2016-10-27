@@ -31,7 +31,6 @@
 #include "plasma.h"
 #include "plasma_client.h"
 #include "plasma_manager.h"
-#include "plasma_manager_tests.h"
 #include "state/db.h"
 #include "state/object_table.h"
 
@@ -79,8 +78,9 @@ struct client_object_connection {
   char **manager_vector;
   /** The number of manager locations in the array manager_vector. */
   int manager_count;
-  /** The index of the next manager in manager_vector that we should try to
-   * contact. */
+  /** The next manager we should try to contact. This is set to an index in
+   * manager_vector in the retry handler, in case the current attempt fails to
+   * contact a manager. */
   int next_manager;
   /** Handle for the uthash table in the client connection
    *  context that keeps track of active object connection
@@ -130,6 +130,7 @@ void free_client_object_connection(client_object_connection *object_conn) {
 
 int send_client_reply(client_connection *conn, plasma_reply *reply) {
   CHECK(conn->num_return_objects >= 0);
+  --conn->num_return_objects;
   /* TODO(swang): Handle errors in write. */
   int n = write(conn->fd, (uint8_t *) reply, sizeof(plasma_reply));
   return (n != sizeof(plasma_reply));
@@ -167,7 +168,6 @@ client_object_connection *add_object_connection(client_connection *client_conn,
   object_conn->manager_vector = NULL;
   object_conn->next_manager = 0;
   /* Register the object context with the client context. */
-  client_conn->num_return_objects++;
   HASH_ADD(active_hh, client_conn->active_objects, object_id, sizeof(object_id),
            object_conn);
   /* Register the object context with the manager state. */
@@ -189,7 +189,6 @@ client_object_connection *add_object_connection(client_connection *client_conn,
 void remove_object_connection(client_connection *client_conn,
                               client_object_connection *object_conn) {
   /* Deregister the object context with the client context. */
-  client_conn->num_return_objects--;
   HASH_DELETE(active_hh, client_conn->active_objects, object_conn);
   /* Deregister the object context with the manager state. */
   client_object_connection *object_conns;
@@ -654,6 +653,7 @@ void process_fetch_requests(client_connection *client_conn,
                             int num_object_ids,
                             object_id object_ids[]) {
   for (int i = 0; i < num_object_ids; ++i) {
+    ++client_conn->num_return_objects;
     process_fetch_request(client_conn, object_ids[i]);
   }
 }
@@ -722,10 +722,10 @@ client_connection *new_client_connection(event_loop *loop,
   return conn;
 }
 
-void _new_client_connection(event_loop *loop,
-                            int listener_sock,
-                            void *context,
-                            int events) {
+void handle_new_client(event_loop *loop,
+                       int listener_sock,
+                       void *context,
+                       int events) {
   (void) new_client_connection(loop, listener_sock, context, events);
 }
 
@@ -747,7 +747,7 @@ void start_server(const char *store_socket_name,
   LOG_DEBUG("Started server connected to store %s, listening on port %d",
             store_socket_name, port);
   event_loop_add_file(g_manager_state->loop, sock, EVENT_LOOP_READ,
-                      _new_client_connection, g_manager_state);
+                      handle_new_client, g_manager_state);
   event_loop_run(g_manager_state->loop);
 }
 

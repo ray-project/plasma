@@ -12,7 +12,6 @@
 #include "plasma.h"
 #include "plasma_client.h"
 #include "plasma_manager.h"
-#include "plasma_manager_tests.h"
 
 SUITE(plasma_manager_tests);
 

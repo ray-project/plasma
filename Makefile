@@ -13,7 +13,7 @@ clean:
 	cd common; make clean
 	rm -r $(BUILD)/*
 
-$(BUILD)/manager_tests: test/manager_tests.c src/plasma.h src/plasma_client.h src/plasma_manager.h src/plasma_manager.c src/fling.h src/fling.c common
+$(BUILD)/manager_tests: test/manager_tests.c src/plasma.h src/plasma_client.h src/plasma_client.c src/plasma_manager.h src/plasma_manager.c src/fling.h src/fling.c common
 	$(CC) $(CFLAGS) $(TEST_CFLAGS) -o $@ test/manager_tests.c src/plasma_manager.c src/plasma_client.c src/fling.c common/build/libcommon.a common/thirdparty/hiredis/libhiredis.a
 
 $(BUILD)/plasma_store: src/plasma_store.c src/plasma.h src/fling.h src/fling.c src/malloc.c src/malloc.h thirdparty/dlmalloc.c common
