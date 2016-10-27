@@ -440,8 +440,12 @@ client_connection *get_manager_connection(plasma_manager_state *state,
             utstring_body(ip_addr_port), get_client_id(state->db));
   if (!manager_conn) {
     /* If we don't already have a connection to this manager, start one. */
+    int fd = plasma_manager_connect(ip_addr, port);
+    /* TODO(swang): Handle the case when connection to this manager was
+     * unsuccessful. */
+    CHECK(fd >= 0);
     manager_conn = malloc(sizeof(client_connection));
-    manager_conn->fd = plasma_manager_connect(ip_addr, port);
+    manager_conn->fd = fd;
     manager_conn->manager_state = state;
     manager_conn->transfer_queue = NULL;
     manager_conn->cursor = 0;
@@ -637,6 +641,8 @@ void process_fetch_request(client_connection *client_conn,
     return;
   }
   /* Register the new context with the current client connection. */
+  /* TODO(swang): If there is already an outstanding fetch request for this
+   * object, exit now. */
   client_object_connection *object_conn =
       add_object_connection(client_conn, object_id);
   if (!object_conn) {

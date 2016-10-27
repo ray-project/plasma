@@ -4,7 +4,11 @@
 #include <poll.h>
 #include "utarray.h"
 
+#ifndef RAY_NUM_RETRIES
 #define NUM_RETRIES 5
+#else
+#define NUM_RETRIES RAY_NUM_RETRIES
+#endif
 
 /* Timeouts are in milliseconds. */
 #ifndef RAY_TIMEOUT

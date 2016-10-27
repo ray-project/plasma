@@ -62,11 +62,13 @@ plasma_connection *plasma_connect(const char *store_socket_name,
 void plasma_disconnect(plasma_connection *conn);
 
 /**
- * Connect to a possibly remote Plasma Manager.
+ * Try to connect to a possibly remote Plasma Manager.
  *
  * @param addr The IP address of the Plasma Manager to connect to.
  * @param port The port of the Plasma Manager to connect to.
- * @return The file descriptor to use to send messages to the Plasma Manager.
+ * @return The file descriptor to use to send messages to the
+ *         Plasma Manager. If connection was unsuccessful, this
+ *         value is -1.
  */
 int plasma_manager_connect(const char *addr, int port);
 
