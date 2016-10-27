@@ -14,8 +14,11 @@ class PlasmaID(ctypes.Structure):
 def make_plasma_id(string):
   if len(string) != PLASMA_ID_SIZE:
     raise Exception("PlasmaIDs must be {} characters long".format(PLASMA_ID_SIZE))
-  object_id = map(ord, string)
-  return PlasmaID(plasma_id=ID(*object_id))
+  # object_id = map(ord, string)
+  return PlasmaID(plasma_id=ID.from_buffer_copy(string))
+
+def plasma_id_to_str(plasma_id):
+  return str(bytearray(plasma_id.plasma_id))
 
 class PlasmaBuffer(object):
   """This is the type of objects returned by calls to get with a PlasmaClient.
@@ -241,7 +244,7 @@ class PlasmaClient(object):
                             object_id_array._length_,
                             object_id_array,
                             timeout, num_returns, return_id_array)
-    return return_id_array
+    return map(plasma_id_to_str, return_id_array)
 
   def subscribe(self):
     """Subscribe to notifications about sealed objects."""

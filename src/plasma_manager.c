@@ -672,6 +672,19 @@ void process_fetch_requests(client_connection *client_conn,
   }
 }
 
+void return_from_wait(client_connection *client_conn) {
+  CHECK(client_conn->is_wait);
+  int64_t size = sizeof(plasma_reply) + (client_conn->wait_reply->num_object_ids - 1) * sizeof(object_id);
+  int n = write(client_conn->fd, (uint8_t*) client_conn->wait_reply, size);
+  CHECK(n == size);
+  free(client_conn->wait_reply);
+  /* Clean the remaining object connections. */
+  client_object_connection *object_conn, *tmp;
+  HASH_ITER(active_hh, client_conn->active_objects, object_conn, tmp) {
+    remove_object_connection(client_conn, object_conn);
+  }
+}
+
 void process_wait_request(client_connection *client_conn,
                           int num_object_ids,
                           object_id object_ids[],
@@ -690,13 +703,15 @@ void process_wait_request(client_connection *client_conn,
       /* If an object id occurs twice in object_ids, this will count them twice.
        * This might not be desirable behavior. */
       client_conn->num_return_objects -= 1;
-      /* TODO(pcm): If this is 0, return immediately. */
-      LOG_INFO("Waiting for %d more objects", client_conn->num_return_objects);
+      client_conn->wait_reply->object_ids[client_conn->num_return_objects] = entry->object_id;
+      if (client_conn->num_return_objects == 0) {
+        return_from_wait(client_conn);
+        return;
+      }
     } else {
       add_object_connection(client_conn, object_ids[i]);
     }
   }
-  printf("num return object: %d\n", client_conn->num_return_objects);
 }
 
 void process_object_notification(event_loop *loop,
@@ -729,13 +744,10 @@ void process_object_notification(event_loop *loop,
     } else {
       client_conn->num_return_objects -= 1;
       client_conn->wait_reply->object_ids[client_conn->num_return_objects] = obj_id;
-      printf("XXX num_return_objects is %d\n", client_conn->num_return_objects);
       if (client_conn->num_return_objects == 0) {
-        int64_t size =  sizeof(plasma_reply) + (client_conn->wait_reply->num_object_ids - 1) * sizeof(object_id);
-        int n = write(client_conn->fd, (uint8_t*) client_conn->wait_reply, size);
-        CHECK(n == size);
-        free(client_conn->wait_reply);
-        /* TODO: Remove all the other objects. */
+        return_from_wait(client_conn);
+        object_conn = next;
+        continue;
       }
     }
     remove_object_connection(client_conn, object_conn);

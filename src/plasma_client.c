@@ -298,6 +298,7 @@ int plasma_subscribe(plasma_connection *conn) {
    * message because otherwise it seems to hang on Linux. */
   char dummy = '\0';
   send_fd(conn->store_conn, fd[1], &dummy, 1);
+  close(fd[1]);
   /* Return the file descriptor that the client should use to read notifications
    * about sealed objects. */
   return fd[0];
