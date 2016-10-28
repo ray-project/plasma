@@ -78,6 +78,16 @@ int contains_object(client *client_context, object_id object_id);
 void delete_object(client *client_context, object_id object_id);
 
 /**
+ * Delete objects until we have freed up num_bytes bytes or there are no more
+ * released objects that can be deleted.
+ *
+ * @param client_context The context of the client making this request.
+ * @param num_bytes The number of bytes to try to free up.
+ * @return The total number of bytes of space retrieved.
+ */
+int64_t evict_objects(client *client_context, int64_t num_bytes);
+
+/**
  * Send notifications about sealed objects to the subscribers. This is called
  * in seal_object. If the socket's send buffer is full, the notification will be
  * buffered, and this will be called again when the send buffer has room.
