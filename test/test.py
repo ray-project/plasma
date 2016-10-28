@@ -256,12 +256,10 @@ class TestPlasmaManager(unittest.TestCase):
     else:
       self.p4 = subprocess.Popen(plasma_manager_command1)
       self.p5 = subprocess.Popen(plasma_manager_command2)
-      time.sleep(0.1)
 
     # Connect two PlasmaClients.
     self.client1 = plasma.PlasmaClient(store_name1, "127.0.0.1", self.port1)
     self.client2 = plasma.PlasmaClient(store_name2, "127.0.0.1", self.port2)
-    time.sleep(0.5)
 
   def tearDown(self):
     # Kill the PlasmaStore and PlasmaManager processes.
