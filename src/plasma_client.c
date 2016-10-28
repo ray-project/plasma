@@ -377,7 +377,7 @@ int plasma_manager_try_connect(const char *ip_addr, int port) {
   int r = connect(fd, (struct sockaddr *) &addr, sizeof(addr));
   if (r < 0) {
     LOG_ERR(
-        "could not establish connection to manager with id %s:%d (probably ran "
+        "could not establish connection to manager with id %s:%d (may have run "
         "out of ports)",
         &ip_addr[0], port);
     return -1;

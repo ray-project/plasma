@@ -252,7 +252,6 @@ class TestPlasmaManager(unittest.TestCase):
     if USE_VALGRIND:
       self.p4 = subprocess.Popen(["valgrind", "--track-origins=yes", "--leak-check=full", "--error-exitcode=1"] + plasma_manager_command1)
       self.p5 = subprocess.Popen(["valgrind", "--track-origins=yes", "--leak-check=full", "--error-exitcode=1"] + plasma_manager_command2)
-      time.sleep(2.0)
     else:
       self.p4 = subprocess.Popen(plasma_manager_command1)
       self.p5 = subprocess.Popen(plasma_manager_command2)

@@ -744,12 +744,13 @@ void start_server(const char *store_socket_name,
                   int port,
                   const char *db_addr,
                   int db_port) {
-  int sock = bind_inet_sock(port);
-  CHECKM(sock >= 0, "Unable to bind to manager port");
-
   g_manager_state = init_plasma_manager_state(store_socket_name, master_addr,
                                               port, db_addr, db_port);
   CHECK(g_manager_state);
+
+  int sock = bind_inet_sock(port);
+  CHECKM(sock >= 0, "Unable to bind to manager port");
+
   LOG_DEBUG("Started server connected to store %s, listening on port %d",
             store_socket_name, port);
   event_loop_add_file(g_manager_state->loop, sock, EVENT_LOOP_READ,
