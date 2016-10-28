@@ -38,6 +38,7 @@ matrix:
         - sudo apt-get install -qq valgrind
       script:
         - make
+        - make valgrind
         - source setup-env.sh
         - python test/test.py valgrind
 
