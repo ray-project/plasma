@@ -35,6 +35,8 @@
 #include "state/db.h"
 #include "state/object_table.h"
 
+int64_t GetTimeStamp();
+
 #define NUM_RETRIES 5
 
 /* Timeouts are in milliseconds. */
@@ -278,7 +280,7 @@ plasma_manager_state *init_plasma_manager_state(const char *store_socket_name,
                                                 int db_port) {
   plasma_manager_state *state = malloc(sizeof(plasma_manager_state));
   state->loop = event_loop_create();
-  state->plasma_conn = plasma_connect(store_socket_name, NULL, 0);
+  state->plasma_conn = plasma_connect(store_socket_name, NULL);
   state->manager_connections = NULL;
   state->fetch_connections = NULL;
   if (db_addr) {
@@ -800,7 +802,7 @@ void process_message(event_loop *loop,
   case PLASMA_SEAL:
     LOG_DEBUG("Publishing to object table from DB client %d.",
               get_client_id(conn->manager_state->db));
-    object_table_add(conn->manager_state->db, req->object_ids[0]);
+    // object_table_add(conn->manager_state->db, req->object_ids[0]);
     break;
   case DISCONNECT_CLIENT: {
     LOG_INFO("Disconnecting client on fd %d", client_sock);
@@ -818,12 +820,14 @@ void process_message(event_loop *loop,
   free(req);
 }
 
-void new_client_connection(event_loop *loop,
-                           int listener_sock,
-                           void *context,
-                           int events) {
+void new_manager_connection(event_loop *loop,
+                            int listener_sock,
+                            void *context,
+                            int events) {
   int new_socket = accept_client(listener_sock);
-  /* Create a new data connection context per client. */
+  /* Create a new data connection context per manager 
+   * TODO(pcm): split this into a context for managers and a context
+   * for clients. */
   client_connection *conn = malloc(sizeof(client_connection));
   conn->manager_state = (plasma_manager_state *) context;
   conn->transfer_queue = NULL;
@@ -831,23 +835,46 @@ void new_client_connection(event_loop *loop,
   conn->active_objects = NULL;
   conn->num_return_objects = 0;
   event_loop_add_file(loop, new_socket, EVENT_LOOP_READ, process_message, conn);
-  LOG_DEBUG("New plasma manager connection with fd %d", new_socket);
+  LOG_DEBUG("New manager connection with fd %d", new_socket);
+}
+
+void new_client_connection(event_loop *loop,
+                           int listener_sock,
+                           void *context,
+                           int events) {
+  int new_socket = accept_client(listener_sock);
+  /* Create a new data connection context per client
+   * TODO(pcm): split this into a context for managers and a context
+   * for clients. */
+  client_connection *conn = malloc(sizeof(client_connection));
+  conn->manager_state = (plasma_manager_state *) context;
+  conn->transfer_queue = NULL;
+  conn->fd = new_socket;
+  conn->active_objects = NULL;
+  conn->num_return_objects = 0;
+  event_loop_add_file(loop, new_socket, EVENT_LOOP_READ, process_message, conn);
+  LOG_DEBUG("New client connection with fd %d", new_socket);
 }
 
 void start_server(const char *store_socket_name,
+                  const char *manager_socket_name,
                   const char *master_addr,
                   int port,
                   const char *db_addr,
                   int db_port) {
-  int sock = bind_inet_sock(port);
-  CHECKM(sock >= 0, "Unable to bind to manager port");
+  int remote_sock = bind_inet_sock(port);
+  CHECKM(remote_sock >= 0, "Unable to bind to remote manager port");
+  int local_sock = bind_ipc_sock(manager_socket_name);
+  CHECKM(local_sock >= 0, "Unable to bind local manager socket");
 
   g_manager_state = init_plasma_manager_state(store_socket_name, master_addr,
                                               port, db_addr, db_port);
   CHECK(g_manager_state);
   LOG_DEBUG("Started server connected to store %s, listening on port %d",
             store_socket_name, port);
-  event_loop_add_file(g_manager_state->loop, sock, EVENT_LOOP_READ,
+  event_loop_add_file(g_manager_state->loop, remote_sock, EVENT_LOOP_READ,
+                      new_manager_connection, g_manager_state);
+  event_loop_add_file(g_manager_state->loop, local_sock, EVENT_LOOP_READ,
                       new_client_connection, g_manager_state);
   event_loop_run(g_manager_state->loop);
 }
@@ -866,6 +893,8 @@ int main(int argc, char *argv[]) {
   signal(SIGTERM, signal_handler);
   /* Socket name of the plasma store this manager is connected to. */
   char *store_socket_name = NULL;
+  /* Socket name this manager will bind to. */
+  char *manager_socket_name = NULL;
   /* IP address of this node. */
   char *master_addr = NULL;
   /* Port number the manager should use. */
@@ -873,12 +902,15 @@ int main(int argc, char *argv[]) {
   /* IP address and port of state database. */
   char *db_host = NULL;
   int c;
-  while ((c = getopt(argc, argv, "s:m:p:r:")) != -1) {
+  while ((c = getopt(argc, argv, "s:m:h:p:r:")) != -1) {
     switch (c) {
     case 's':
       store_socket_name = optarg;
       break;
     case 'm':
+      manager_socket_name = optarg;
+      break;
+    case 'h':
       master_addr = optarg;
       break;
     case 'p':
@@ -898,6 +930,12 @@ int main(int argc, char *argv[]) {
         "switch");
     exit(-1);
   }
+  if (!manager_socket_name) {
+    LOG_ERR(
+        "please specify socket name of the manager's local socket with -m "
+        "switch");
+    exit(-1);
+  }
   if (!master_addr) {
     LOG_ERR(
         "please specify ip address of the current host in the format "
@@ -914,8 +952,8 @@ int main(int argc, char *argv[]) {
   int db_port;
   if (db_host) {
     parse_ip_addr_port(db_host, db_addr, &db_port);
-    start_server(store_socket_name, master_addr, port, db_addr, db_port);
+    start_server(store_socket_name, manager_socket_name, master_addr, port, db_addr, db_port);
   } else {
-    start_server(store_socket_name, master_addr, port, NULL, 0);
+    start_server(store_socket_name, manager_socket_name, master_addr, port, NULL, 0);
   }
 }

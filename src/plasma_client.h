@@ -40,17 +40,15 @@ plasma_request *make_plasma_multiple_request(int num_object_ids,
  * Connect to the local plasma store and plasma manager. Return
  * the resulting connection.
  *
- * @param socket_name The name of the UNIX domain socket to use to connect to
- *        the Plasma Store.
- * @param manager_addr The IP address of the plasma manager to connect to. If
- *        this is NULL, then this function will not connect to a manager.
- * @param manager_port The port of the plasma manager to connect to. If
- *        manager_addr is NULL, then this argument is unused.
+ * @param store_socket_name The name of the UNIX domain socket to use to
+ *        connect to the Plasma store.
+ * @param manager_socket_name The name of the UNIX domain socket to use to
+ *        connect to the local Plasma manager. If this is NULL, then this
+ *        function will not connect to a manager.
  * @return The object containing the connection state.
  */
 plasma_connection *plasma_connect(const char *store_socket_name,
-                                  const char *manager_addr,
-                                  int manager_port);
+                                  const char *manager_socket_name);
 
 /**
  * Disconnect from the local plasma instance, including the local store and

@@ -142,8 +142,8 @@ void send_queued_request(event_loop *loop,
                          int events);
 
 /**
- * Register a new client connection with the plasma manager. A client can
- * either be a worker or another plasma manager.
+ * Register a new client connection with the plasma manager. A client is
+ * a local process connected to the plasma manager via a Unix domain socket.
  *
  * @param loop This is the event loop of the plasma manager.
  * @param listener_socket The socket the plasma manager is listening on.
@@ -154,6 +154,22 @@ void new_client_connection(event_loop *loop,
                            int listener_sock,
                            void *context,
                            int events);
+
+
+/**
+ * Register a new manager connection with the plasma manager. A manager is
+ * a remote plasma manager process connected to this plasma manager via a TCP
+ * socket.
+ *
+ * @param loop This is the event loop of the plasma manager.
+ * @param listener_socket The socket the plasma manager is listening on.
+ * @param context The plasma manager state.
+ * @return Void.
+ */
+void new_manager_connection(event_loop *loop,
+                            int listener_sock,
+                            void *context,
+                            int events);
 
 /* The buffer size in bytes. Data will get transfered in multiples of this */
 #define BUFSIZE 4096

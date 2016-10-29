@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <sys/time.h>
+
 #include "common.h"
 
 typedef struct {
